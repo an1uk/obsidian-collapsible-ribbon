@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Collapsible Ribbon</title>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="12" y="14" width="40" height="36" rx="6" stroke="currentColor" stroke-width="2.6"/>
+    <path d="M25 15v34" stroke="currentColor" stroke-width="2.6"/>
+    <path d="M18 22h1m-1 10h1m-1 10h1" stroke="currentColor" stroke-width="3.6"/>
+    <path d="M32 23h12M32 32h8M32 41h5" stroke="currentColor" stroke-width="2.6"/>
+    <path d="m43 37 4 4-4 4" stroke="currentColor" stroke-width="2.6"/>
+  </g>
+</svg>

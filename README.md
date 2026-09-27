@@ -1,4 +1,6 @@
 <!-- codex-generated: 2026-09-27 -->
+<img src="assets/icon.svg" alt="Collapsible Ribbon icon" width="96" height="96">
+
 # Collapsible Ribbon 1.1.0
 
 Hover over an existing left-ribbon action to open a wider navigation rail over nearby content. The native ribbon remains narrow and the editor does not move. Click the bottom pin to keep the rail open and reserve space for it; unpinning returns to hover mode.
@@ -66,6 +68,13 @@ These fixtures do not establish live Obsidian acceptance. After installation:
 - Enable/disable a ribbon-adding plugin, switch workspaces, and try AnuPpuccin's light/dark, card, border and frame options.
 - Check tooltip suppression only while expanded, labels disabled, animation disabled, and OS reduced motion.
 - Disable the plugin while hovering, pinned, resizing or waiting to dismiss. Confirm native width and tooltips return and all existing actions work.
+
+## Plugin icon
+
+The custom icon depicts an expanded navigation rail and its action labels. Use [assets/icon.png](assets/icon.png) (512 by 512 pixels) for the community listing, or the scalable [SVG](assets/icon.svg). A [monochrome SVG](assets/icon-monochrome.svg) is also available; it uses currentColor for theme-aware embedding. All artwork is original and covered by this repository's MIT licence.
+
+After adding the plugin to the community directory, open its entry, choose Edit listing, and set the icon there. See the [official listing instructions](https://docs.obsidian.md/community-directory/manage-entry). These assets give the plugin a visual identity; the ribbon's pin/unpin control keeps its existing functional icons.
+
 ## Community directory submission
 
 This repository is public under the [MIT licence](LICENSE). Releases include main.js, manifest.json and styles.css as individual assets, as well as the manual-install ZIP. The release tag must exactly match manifest.json (1.1.0, without a v prefix).
