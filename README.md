@@ -7,7 +7,7 @@ Hover over an existing left-ribbon action to open a wider navigation rail over n
 
 ## Installation and use
 
-1. Download **collapsible-ribbon.zip** from the [latest GitHub release](https://github.com/an1uk/collapsible-ribbon/releases/latest). Extract the folder into your vault's community-plugin directory, or copy **manifest.json**, **main.js**, and **styles.css** into **.obsidian/plugins/collapsible-ribbon/**.
+1. Download **collapsible-ribbon.zip** from the [latest GitHub release](https://github.com/an1uk/obsidian-collapsible-ribbon/releases/latest). Extract the folder into your vault's community-plugin directory, or copy **manifest.json**, **main.js**, and **styles.css** into **.obsidian/plugins/collapsible-ribbon/**.
 2. Disable/re-enable Collapsible Ribbon or restart Obsidian. The ribbon must be visible in Appearance settings.
 3. Hover an action to reveal labels. The panel stays open across its full area, including the space between top and bottom actions. When unpinned, it closes 180 ms after both pointer and keyboard focus leave.
 4. Click the bottom pin to pin/unpin. Tab, Enter and Space work with the pin. Drag the subtle grip at the right edge to resize in either expanded mode.
@@ -82,7 +82,7 @@ This repository is public under the [MIT licence](LICENSE). Releases include mai
 After completing the live acceptance checks above, follow the [official submission guide](https://docs.obsidian.md/plugins/releasing/submit-plugin):
 
 1. Sign in at [community.obsidian.md](https://community.obsidian.md) with your Obsidian account and connect GitHub.
-2. Select Plugins, then New plugin, and enter https://github.com/an1uk/collapsible-ribbon.
+2. Select Plugins, then New plugin, and enter https://github.com/an1uk/obsidian-collapsible-ribbon.
 3. Select the owner, review the developer policies and maintenance commitment, and submit.
 4. Address any review errors with an incremented manifest/package version, updated versions.json, and a matching GitHub release with the three runtime assets.
 
