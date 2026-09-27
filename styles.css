@@ -1,0 +1,159 @@
+/* Only pinned mode changes the native flex allocation and header width. */
+.workspace-ribbon.mod-left.cr-ribbon[data-cr-mode="pinned"] {
+  --ribbon-width: var(--cr-expanded-width, 220px);
+}
+
+.workspace-ribbon.mod-left.cr-ribbon[data-cr-mode="overlay"] {
+  overflow: visible;
+}
+
+.workspace-ribbon.mod-left.cr-ribbon > :is(.side-dock-actions, .side-dock-settings) {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.workspace-ribbon.mod-left.cr-ribbon[data-cr-mode="overlay"] > :is(.side-dock-actions, .side-dock-settings) {
+  width: calc(var(--cr-expanded-width) - var(--cr-ribbon-inset));
+}
+
+/* Keep the existing icon nodes in a fixed column, including during transitions. */
+.workspace-ribbon.mod-left.cr-ribbon :is(.side-dock-actions, .side-dock-settings) > .side-dock-ribbon-action {
+  display: grid;
+  grid-template-columns: var(--cr-icon-column, 35px) minmax(0, 1fr);
+  align-items: center;
+  justify-items: center;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  margin-inline: 0;
+  padding-inline: 0;
+}
+
+.workspace-ribbon.mod-left.cr-ribbon[data-cr-mode]:not([data-cr-mode="collapsed"])[data-cr-labels="true"] :is(.side-dock-actions, .side-dock-settings) > .side-dock-ribbon-action[data-cr-label]:not(.cr-pin)::after {
+  content: attr(data-cr-label);
+  display: block;
+  justify-self: stretch;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-inline: var(--size-4-1) var(--size-4-2);
+  font-size: var(--font-ui-small);
+  line-height: var(--icon-l);
+  color: inherit;
+  pointer-events: none;
+}
+
+.workspace-ribbon.mod-left.cr-ribbon .cr-overlay-background {
+  position: fixed;
+  z-index: 0;
+  left: var(--cr-left);
+  top: var(--cr-top);
+  height: var(--cr-height);
+  width: var(--cr-native-width);
+  box-sizing: border-box;
+  background-color: inherit;
+  border-right: inherit;
+  box-shadow: var(--shadow-s);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.workspace-ribbon.mod-left.cr-ribbon[data-cr-mode="overlay"] .cr-overlay-background {
+  width: var(--cr-expanded-width);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.workspace-ribbon.mod-left.cr-ribbon .cr-resize-handle {
+  display: none;
+  position: fixed;
+  z-index: 2;
+  left: calc(var(--cr-left) + var(--cr-visual-width) - 6px);
+  top: var(--cr-top);
+  width: 6px;
+  height: var(--cr-height);
+  cursor: col-resize;
+  touch-action: none;
+  -webkit-app-region: no-drag;
+}
+
+.workspace-ribbon.mod-left.cr-ribbon[data-cr-mode]:not([data-cr-mode="collapsed"]) .cr-resize-handle {
+  display: block;
+}
+
+.workspace-ribbon.mod-left.cr-ribbon .cr-resize-handle::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  width: 2px;
+  height: var(--size-4-6);
+  transform: translateY(-50%);
+  border-radius: var(--radius-s);
+  background-color: var(--background-modifier-border-hover);
+}
+
+.workspace-ribbon.mod-left.cr-ribbon .cr-resize-handle:hover,
+.workspace-ribbon.mod-left.cr-ribbon .cr-resize-handle:focus-visible,
+.workspace-ribbon.mod-left.cr-ribbon[data-cr-resizing="true"] .cr-resize-handle {
+  background-color: var(--background-modifier-border-hover);
+}
+
+.workspace-ribbon.mod-left.cr-ribbon .cr-pin {
+  flex-shrink: 0;
+  color: var(--icon-color);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  -webkit-app-region: no-drag;
+}
+
+.workspace-ribbon.mod-left.cr-ribbon .cr-pin:hover {
+  color: var(--icon-color-hover);
+  background-color: var(--background-modifier-hover);
+}
+
+.workspace-ribbon.mod-left.cr-ribbon .cr-pin[aria-pressed="true"] {
+  color: var(--icon-color-active);
+}
+
+.workspace-ribbon.mod-left.cr-ribbon :is(.cr-pin, .cr-resize-handle):focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -2px;
+}
+
+.workspace-ribbon.mod-left.cr-ribbon[data-cr-mode]:not([data-cr-mode="collapsed"]) :is(.side-dock-ribbon-action, .cr-resize-handle) {
+  --no-tooltip: true;
+}
+
+/* Hide only marked ribbon tooltips, including timers started before expansion. */
+body:has(.workspace-ribbon.mod-left.cr-ribbon[data-cr-mode]:not([data-cr-mode="collapsed"])) .tooltip.cr-ribbon-tooltip {
+  display: none;
+}
+
+.workspace-ribbon.mod-left.cr-ribbon[data-cr-animate="true"]:not([data-cr-resizing="true"]) {
+  transition: width 140ms ease, flex-basis 140ms ease, background-color 140ms ease;
+}
+
+.workspace-ribbon.mod-left.cr-ribbon[data-cr-animate="true"]:not([data-cr-resizing="true"]) > :is(.side-dock-actions, .side-dock-settings),
+.workspace-ribbon.mod-left.cr-ribbon[data-cr-animate="true"]:not([data-cr-resizing="true"]) .cr-overlay-background {
+  transition: width 140ms ease, opacity 140ms ease;
+}
+
+.workspace-ribbon.mod-left.cr-ribbon[data-cr-animate="false"],
+.workspace-ribbon.mod-left.cr-ribbon[data-cr-resizing="true"],
+.workspace-ribbon.mod-left.cr-ribbon[data-cr-resizing="true"] > :is(.side-dock-actions, .side-dock-settings),
+.workspace-ribbon.mod-left.cr-ribbon[data-cr-resizing="true"] .cr-overlay-background {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-ribbon.mod-left.cr-ribbon[data-cr-animate="true"]:not([data-cr-resizing="true"]),
+  .workspace-ribbon.mod-left.cr-ribbon[data-cr-animate="true"]:not([data-cr-resizing="true"]) > :is(.side-dock-actions, .side-dock-settings),
+  .workspace-ribbon.mod-left.cr-ribbon[data-cr-animate="true"]:not([data-cr-resizing="true"]) .cr-overlay-background {
+    transition: none;
+  }
+}

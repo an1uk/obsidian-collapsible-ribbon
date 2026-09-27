@@ -1,0 +1,27 @@
+{
+  "name": "collapsible-ribbon",
+  "version": "1.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "description": "An icon-and-label navigation rail for Obsidian's existing left ribbon.",
+  "scripts": {
+    "dev": "node esbuild.config.mjs --watch",
+    "check": "tsc --noEmit",
+    "build": "tsc --noEmit && node esbuild.config.mjs",
+    "test": "node tests/run.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "happy-dom": "^20.0.0",
+    "obsidian": "1.13.1",
+    "typescript": "^5.9.0"
+  },
+  "license": "MIT",
+  "packageManager": "pnpm@11.19.0",
+  "repository": {
+    "url": "https://github.com/an1uk/collapsible-ribbon.git",
+    "type": "git"
+  }
+}
