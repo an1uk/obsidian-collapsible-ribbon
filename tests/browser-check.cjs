@@ -70,6 +70,9 @@ function markup(theme, css) {
           (button, pinned) => {
             button.innerHTML = '<svg class="svg-icon" viewBox="0 0 24 24"><path d="M8 5h8v7l-4 4-4-4z" stroke="currentColor" fill="none"/></svg>';
             button.setAttribute("aria-label", pinned ? "Unpin ribbon" : "Pin ribbon open");
+          }, (icon, label) => {
+            icon.innerHTML = '<svg class="svg-icon" viewBox="0 0 24 24"><path d="M4 4h16v16H4z" fill="none" stroke="currentColor"/></svg>';
+            icon.dataset.kind = /\b(?:kanban|board)\b/i.test(label) ? "kanban" : "circle-help";
           });
         rail.refresh();
       });
@@ -177,6 +180,34 @@ function markup(theme, css) {
       await page.evaluate(() => { saved.animate = true; saved.pinned = true; rail.applySettings(); });
       assert.equal(await page.locator(".workspace-ribbon.mod-left").evaluate((el) => getComputedStyle(el).transitionDuration), "0s");
       await page.emulateMedia({ reducedMotion: "no-preference" });
+      await page.evaluate(() => {
+        const action = document.createElement("div");
+        action.id = "kanban";
+        action.className = "clickable-icon side-dock-ribbon-action";
+        action.setAttribute("aria-label", "Create new board");
+        window.kanbanCommands = 0;
+        action.addEventListener("click", () => { kanbanCommands++; });
+        document.querySelector(".side-dock-actions").append(action);
+      });
+      await page.waitForFunction(() => document.querySelector("#kanban .cr-fallback-icon svg"));
+      assert.equal(await page.locator("#kanban .cr-fallback-icon").getAttribute("data-kind"), "kanban");
+      assert.equal(await page.locator("#kanban").getAttribute("aria-label"), "Create new board");
+      const kanbanIconX = await page.locator("#kanban svg").evaluate((el) => {
+        const r = el.getBoundingClientRect(); return r.x + r.width / 2;
+      });
+      const regularIconX = await page.locator("#calendar svg").evaluate((el) => {
+        const r = el.getBoundingClientRect(); return r.x + r.width / 2;
+      });
+      assert.ok(Math.abs(kanbanIconX - regularIconX) < 1, "fallback icon must align with native icons");
+      const kanbanIconBox = await page.locator("#kanban svg").boundingBox();
+      await page.mouse.click(kanbanIconBox.x + kanbanIconBox.width / 2, kanbanIconBox.y + kanbanIconBox.height / 2);
+      assert.equal(await page.evaluate(() => kanbanCommands), 1);
+      await page.evaluate(() => {
+        document.querySelector("#kanban").innerHTML = '<svg class="svg-icon" viewBox="0 0 24 24"></svg>';
+      });
+      await page.waitForFunction(() => !document.querySelector("#kanban .cr-fallback-icon"));
+      await page.evaluate(() => { document.querySelector("#kanban").replaceChildren(); });
+      await page.waitForFunction(() => document.querySelector("#kanban .cr-fallback-icon svg"));
       const writesBeforeUnload = await page.evaluate(() => writes.length);
       const unloadHandle = await page.locator(".cr-resize-handle").boundingBox();
       await page.mouse.move(unloadHandle.x + 3, unloadHandle.y + 120); await page.mouse.down();

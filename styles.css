@@ -31,6 +31,15 @@
   padding-inline: 0;
 }
 
+.workspace-ribbon.mod-left.cr-ribbon .cr-fallback-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-size);
+  height: var(--icon-size);
+  pointer-events: none;
+}
+
 .workspace-ribbon.mod-left.cr-ribbon[data-cr-mode]:not([data-cr-mode="collapsed"])[data-cr-labels="true"] :is(.side-dock-actions, .side-dock-settings) > .side-dock-ribbon-action[data-cr-label]:not(.cr-pin)::after {
   content: attr(data-cr-label);
   display: block;

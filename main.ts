@@ -21,6 +21,7 @@ export default class CollapsibleRibbonPlugin extends Plugin {
         setIcon(button, pinned ? "pin-off" : "pin");
         setTooltip(button, pinned ? "Unpin ribbon" : "Pin ribbon open", { placement: "right" });
       },
+      (icon, label) => setIcon(icon, /\b(?:kanban|board)\b/i.test(label) ? "kanban" : "circle-help"),
     );
     this.addSettingTab(new RibbonSettingTab(this));
     this.registerEvent(this.app.workspace.on("layout-change", () => this.rail?.refresh()));

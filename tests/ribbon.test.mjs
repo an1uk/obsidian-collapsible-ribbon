@@ -24,6 +24,8 @@ function fixture() {
   }, (button, pinned) => {
     button.textContent = pinned ? "pin-off" : "pin";
     button.setAttribute("aria-label", pinned ? "Unpin ribbon" : "Pin ribbon open");
+  }, (icon, label) => {
+    icon.textContent = /\b(?:kanban|board)\b/i.test(label) ? "kanban" : "circle-help";
   });
   const pointer = (type, options = {}) => new win.PointerEvent(type, {
     bubbles: type !== "pointerleave" && type !== "pointerenter",
@@ -198,6 +200,37 @@ test("late items, reference labels, missing metadata, reorder and replaced group
   await f.close();
 });
 
+test("iconless Kanban action gets a reversible fallback without replacing its handler or a later native icon", async () => {
+  const f = fixture(); f.rail.refresh();
+  const action = f.win.document.createElement("div");
+  action.className = "side-dock-ribbon-action clickable-icon";
+  action.setAttribute("aria-label", "Create new board");
+  let clicks = 0;
+  action.addEventListener("click", () => clicks++);
+  f.ribbon().querySelector(".side-dock-actions").append(action);
+  await delay();
+  let fallback = action.querySelector(".cr-fallback-icon");
+  assert.ok(fallback);
+  assert.equal(fallback.textContent, "kanban");
+  assert.equal(action.getAttribute("aria-label"), "Create new board");
+  fallback.click(); assert.equal(clicks, 1);
+  f.enter(); assert.equal(action.getAttribute("data-cr-label"), "Create new board");
+  const nativeIcon = f.win.document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  action.replaceChildren(nativeIcon);
+  await delay();
+  assert.equal(action.firstElementChild, nativeIcon);
+  assert.equal(action.querySelector(".cr-fallback-icon"), null);
+  action.replaceChildren(); await delay();
+  fallback = action.querySelector(".cr-fallback-icon");
+  assert.equal(fallback.textContent, "kanban");
+  action.setAttribute("aria-label", "Other action"); await delay();
+  assert.equal(fallback.textContent, "circle-help");
+  f.rail.destroy();
+  assert.equal(action.childElementCount, 0);
+  assert.equal(action.getAttribute("aria-label"), "Other action");
+  assert.equal(action.hasAttribute("data-cr-label"), false);
+  await f.win.happyDOM.close();
+});
 test("unload restores prior values, releases capture, cancels timers and removes listeners", async () => {
   const f = fixture();
   const ribbon = f.ribbon();

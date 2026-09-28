@@ -8,7 +8,7 @@ Make Obsidian's left ribbon easier to use with labelled actions.
 - **Pin it open:** The rail stays visible and the editor makes room for it.
 - **Resize it:** Drag the right edge to set a width from 120 to 300 px. The default is 220 px.
 
-Your existing ribbon buttons, including those added by other plugins, keep working. Labels use their existing accessible names where available. Tooltips appear while the ribbon is collapsed and are hidden while expanded.
+Your existing ribbon buttons, including those added by other plugins, keep working. Empty buttons left by obsolete plugin icons receive a reversible fallback. Labels use their existing accessible names where available. Tooltips appear while the ribbon is collapsed and are hidden while expanded.
 
 ## Use
 

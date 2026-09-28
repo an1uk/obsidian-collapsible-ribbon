@@ -8,10 +8,14 @@ interface ItemState {
   hadTooltipClass: boolean;
   injectedAria: boolean;
   originalAria: string | null;
+  fallback: HTMLElement | null;
+  fallbackLabel: string | null;
 }
 
 export class RibbonItems {
   private readonly items = new Map<HTMLElement, ItemState>();
+
+  constructor(private readonly renderFallback: (icon: HTMLElement, label: string) => void) {}
 
   // Called only for external mutations; the controller pauses observation for its writes.
   capture(records: MutationRecord[]): void {
@@ -50,6 +54,8 @@ export class RibbonItems {
           hadTooltipClass: classes?.split(/\s+/).includes(TOOLTIP_CLASS) ?? false,
           injectedAria: false,
           originalAria: null,
+          fallback: null,
+          fallbackLabel: null,
         };
         this.items.set(item, state);
       }
@@ -59,6 +65,7 @@ export class RibbonItems {
       const label = (references || aria || state.title?.trim() || item.getAttribute("data-tooltip")?.trim() || "")
         .replace(/\s+/g, " ");
       this.attribute(item, "data-cr-label", label || null);
+      this.syncFallback(item, state, label);
       const classes = state.tooltipClasses ?? "";
       this.attribute(item, "data-tooltip-classes", state.hadTooltipClass ? classes : (classes + " " + TOOLTIP_CLASS).trim());
       if (expanded && state.title !== null) {
@@ -78,6 +85,28 @@ export class RibbonItems {
     }
   }
 
+  private syncFallback(item: HTMLElement, state: ItemState, label: string): void {
+    const empty = Array.from(item.childNodes).every((node) =>
+      node === state.fallback || (node.nodeType === 3 && !node.textContent?.trim()));
+    if (!empty) {
+      state.fallback?.remove();
+      state.fallback = null;
+      state.fallbackLabel = null;
+      return;
+    }
+    if (!state.fallback || state.fallback.parentElement !== item) {
+      state.fallback = item.ownerDocument.createElement("span");
+      state.fallback.className = "cr-fallback-icon";
+      state.fallback.setAttribute("aria-hidden", "true");
+      item.prepend(state.fallback);
+      state.fallbackLabel = null;
+    }
+    if (state.fallbackLabel !== label) {
+      this.renderFallback(state.fallback, label);
+      state.fallbackLabel = label;
+    }
+  }
+
   private attribute(item: HTMLElement, name: string, value: string | null): void {
     if (item.getAttribute(name) === value) return;
     if (value === null) item.removeAttribute(name);
@@ -85,6 +114,7 @@ export class RibbonItems {
   }
 
   private restore(item: HTMLElement, state: ItemState): void {
+    state.fallback?.remove();
     this.attribute(item, "data-cr-label", state.labelAttribute);
     this.attribute(item, "data-tooltip-classes", state.tooltipClasses);
     this.attribute(item, "title", state.title);

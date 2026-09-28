@@ -21,7 +21,7 @@ export class RibbonRail {
   private closeTimer: number | null = null;
   private notifyResize = false;
   private destroyed = false;
-  private items = new RibbonItems();
+  private items: RibbonItems;
   private readonly styles = new Map<HTMLElement, Map<string, SavedStyle>>();
   private readonly attributes = new Map<string, string | null>();
   private readonly listeners: Array<() => void> = [];
@@ -40,7 +40,9 @@ export class RibbonRail {
     private readonly settings: () => RibbonSettings,
     private readonly updateSettings: (patch: Partial<RibbonSettings>) => void,
     private readonly renderPin: (button: HTMLElement, pinned: boolean) => void,
+    renderFallback: (icon: HTMLElement, label: string) => void,
   ) {
+    this.items = new RibbonItems(renderFallback);
     this.win = workspace.ownerDocument.defaultView as Window & typeof globalThis;
   }
 
