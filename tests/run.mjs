@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 
 await mkdir("tests/.generated", { recursive: true });
 await build({
-  entryPoints: ["ribbon.ts", "settings.ts"],
+  entryPoints: ["ribbon.ts", "ribbon-order.ts", "settings.ts"],
   outdir: "tests/.generated", bundle: true, platform: "node", format: "cjs",
 });
 await build({
@@ -28,5 +28,5 @@ await build({
     ` }));
   } }],
 });
-const result = spawnSync(process.execPath, ["--test", "tests/ribbon.test.mjs"], { stdio: "inherit" });
+const result = spawnSync(process.execPath, ["--test", "tests/ribbon.test.mjs", "tests/ribbon-order.test.mjs"], { stdio: "inherit" });
 process.exitCode = result.status ?? 1;

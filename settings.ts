@@ -4,6 +4,7 @@ export interface RibbonSettings {
   expandedWidth: number;
   animate: boolean;
   showLabels: boolean;
+  ribbonOrder: string[];
 }
 
 export const MIN_WIDTH = 120;
@@ -14,6 +15,7 @@ export const DEFAULT_SETTINGS: RibbonSettings = {
   expandedWidth: 220,
   animate: true,
   showLabels: true,
+  ribbonOrder: [],
 };
 
 export function clampWidth(width: number): number {
@@ -31,5 +33,7 @@ export function normalizeSettings(data: unknown): RibbonSettings {
       ? clampWidth(saved.expandedWidth) : DEFAULT_SETTINGS.expandedWidth,
     animate: typeof saved.animate === "boolean" ? saved.animate : true,
     showLabels: typeof saved.showLabels === "boolean" ? saved.showLabels : true,
+    ribbonOrder: current && Array.isArray(saved.ribbonOrder)
+      ? [...new Set(saved.ribbonOrder.filter((id): id is string => typeof id === "string" && id.length > 0))] : [],
   };
 }

@@ -1,10 +1,13 @@
 import { Plugin, PluginSettingTab, Setting, Notice, setIcon, setTooltip } from "obsidian";
+import { RibbonOrder } from "./ribbon-order";
 import { RibbonRail } from "./ribbon";
 import { DEFAULT_SETTINGS, normalizeSettings, type RibbonSettings } from "./settings";
 
 export default class CollapsibleRibbonPlugin extends Plugin {
   settings: RibbonSettings = { ...DEFAULT_SETTINGS };
   private rail: RibbonRail | null = null;
+  private order: RibbonOrder | null = null;
+  private layoutReady = false;
   private active = false;
   private saveQueue: Promise<void> = Promise.resolve();
 
@@ -23,12 +26,25 @@ export default class CollapsibleRibbonPlugin extends Plugin {
       },
       (icon, label) => setIcon(icon, /\b(?:kanban|board)\b/i.test(label) ? "kanban" : "circle-help"),
     );
+    this.order = new RibbonOrder(
+      this.app.workspace.containerEl,
+      () => this.app.workspace.leftRibbon,
+      () => this.settings,
+      (patch) => this.updateSettings(patch),
+    );
     this.addSettingTab(new RibbonSettingTab(this));
-    this.registerEvent(this.app.workspace.on("layout-change", () => this.rail?.refresh()));
+    this.registerEvent(this.app.workspace.on("layout-change", () => {
+      this.rail?.refresh();
+      if (this.layoutReady) this.order?.refresh();
+    }));
     this.registerEvent(this.app.workspace.on("css-change", () => this.rail?.refreshMetrics()));
     this.app.workspace.onLayoutReady(() => {
       // onLayoutReady has no unsubscribe API; guard a plugin disabled during startup.
-      if (this.active) this.rail?.refresh();
+      if (this.active) {
+        this.layoutReady = true;
+        this.rail?.refresh();
+        this.order?.refresh();
+      }
     });
   }
 
@@ -45,6 +61,9 @@ export default class CollapsibleRibbonPlugin extends Plugin {
 
   onunload(): void {
     this.active = false;
+    this.order?.destroy();
+    this.order = null;
+    this.layoutReady = false;
     this.rail?.destroy();
     this.rail = null;
   }

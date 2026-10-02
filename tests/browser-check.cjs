@@ -33,6 +33,7 @@ function markup(theme, css) {
 (async () => {
   const css = fs.readFileSync("styles.css", "utf8");
   const bundle = await build({ entryPoints: ["./ribbon.ts"], bundle: true, write: false, format: "iife", globalName: "FixtureRail" });
+  const orderBundle = await build({ entryPoints: ["./ribbon-order.ts"], bundle: true, write: false, format: "iife", globalName: "FixtureOrder" });
   const browser = await chromium.launch({ headless: true, executablePath: chromePath });
   try {
     const page = await browser.newPage({ viewport: { width: 1000, height: 650 } });
@@ -222,6 +223,65 @@ function markup(theme, css) {
       for (let index = 0; index < original.icons.length; index++) assert.deepEqual(unloaded.icons[index], original.icons[index]);
       console.log(JSON.stringify({ theme, hoverRibbon: overlay.ribbon, hoverEditor: overlay.editor, pinnedRibbon: pinned.ribbon,
         pinnedEditor: pinned.editor, resize: true, tooltipScope: true, iconsAligned: true, unloadRestored: true }));
+      // Verify ordering with real theme CSS and native-style mouse commits.
+      await page.setContent(markup(theme, css));
+      await page.addScriptTag({ content: bundle.outputFiles[0].text });
+      await page.addScriptTag({ content: orderBundle.outputFiles[0].text });
+      await page.evaluate(() => {
+        window.saved = { settingsVersion:2, pinned:false, expandedWidth:220, animate:false, showLabels:true,
+          ribbonOrder:["late", "long-label", "calendar"] };
+        window.native = {
+          containerEl: document.querySelector(".mod-left"), ribbonItemsEl:document.querySelector(".side-dock-actions"),
+          items: ["calendar", "long-label"].map(id => ({id,buttonEl:document.getElementById(id)})),
+          onChange() { this.ribbonItemsEl.replaceChildren(...this.items.map(item => item.buttonEl)); },
+        };
+        window.orderWrites = [];
+        window.order = new FixtureOrder.RibbonOrder(document.querySelector(".workspace"), () => native,
+          () => saved, patch => {orderWrites.push(patch); Object.assign(saved,patch);});
+        window.rail = new FixtureRail.RibbonRail(document.querySelector(".workspace"), () => saved,
+          patch => {Object.assign(saved,patch);rail.applySettings();}, button => {
+            button.textContent="pin"; button.setAttribute("aria-label","Pin ribbon open");
+          }, icon => {icon.innerHTML="<svg></svg>";});
+        rail.refresh(); order.refresh();
+        window.late = document.getElementById("calendar").cloneNode(true);
+        late.id="late"; late.setAttribute("aria-label","Late plugin");
+        native.items.push({id:"late",buttonEl:late}); native.onChange(false);
+      });
+      await page.waitForFunction(() => document.querySelector(".side-dock-actions").firstElementChild.id === "late");
+      const orderIds = () => page.evaluate(() => Array.from(native.ribbonItemsEl.children,el=>el.id));
+      assert.deepEqual(await orderIds(), ["late", "long-label", "calendar"]);
+      const orderedCollapsed = await geometry();
+      await page.locator("#calendar").hover();
+      const orderedOverlay = await geometry();
+      assert.equal(orderedCollapsed.ribbon, orderedOverlay.ribbon);
+      assert.equal(orderedCollapsed.editor, orderedOverlay.editor);
+      assert.ok(orderedOverlay.icons.every(icon => Math.abs(icon.x-orderedCollapsed.icons[0].x)<1));
+      await page.mouse.down();
+      await page.evaluate(() => {
+        native.ribbonItemsEl.prepend(document.getElementById("calendar"));
+        window.addEventListener("mouseup", () => {
+          native.items = Array.from(native.ribbonItemsEl.children,buttonEl => native.items.find(item => item.buttonEl===buttonEl));
+          native.onChange(true);
+        }, {once:true});
+      });
+      await page.waitForTimeout(30);
+      assert.deepEqual(await orderIds(), ["calendar", "late", "long-label"]);
+      await page.mouse.up();
+      await page.waitForFunction(() => saved.ribbonOrder[0] === "calendar");
+      assert.deepEqual(await page.evaluate(() => saved.ribbonOrder), ["calendar", "late", "long-label"]);
+      assert.equal(await page.evaluate(() => orderWrites.length), 1);
+      await page.evaluate(() => {
+        order.destroy(); native.items = native.items.filter(item=>item.id!=="late"); native.onChange(false);
+        window.order = new FixtureOrder.RibbonOrder(document.querySelector(".workspace"), () => native,
+          () => saved, patch => {orderWrites.push(patch);Object.assign(saved,patch);});
+        order.refresh(); native.items.push({id:"late",buttonEl:late}); native.onChange(false);
+      });
+      await page.waitForFunction(() => native.ribbonItemsEl.children[1].id === "late");
+      assert.deepEqual(await orderIds(), ["calendar", "late", "long-label"]);
+      await page.evaluate(() => {order.destroy();rail.destroy();native.items.reverse();native.onChange(false);});
+      await page.waitForTimeout(30);
+      assert.deepEqual(await orderIds(), ["long-label", "late", "calendar"]);
+      console.log(JSON.stringify({theme, orderRestored:true, nativeMouseCommitSaved:true, lateReloadRestored:true, orderUnloadClean:true}));
     }
   } finally { await browser.close(); }
 })().catch((error) => { console.error(error); process.exitCode = 1; });
