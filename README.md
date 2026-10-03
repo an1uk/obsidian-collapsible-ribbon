@@ -14,7 +14,7 @@ Your existing ribbon buttons, including those added by other plugins, keep worki
 
 Hover over a ribbon icon to open the rail. Click the pin at the bottom to keep it open; click again to return to hover mode. Drag the right edge to resize. You can also focus the resize handle and use Left/Right arrows (1 px), Shift+arrows (10 px), or Home/End.
 
-The plugin remembers your ribbon order, pin state and width across restarts. Drag icons into your preferred order; late-loading plugins return to their saved positions. Its settings let you change the width or turn off animations and labels.
+The plugin remembers your ribbon order, pin state and width across restarts. Reorder icons by dragging or through **Settings → Interface → Ribbon menu configuration**. Both views stay synchronized, and late-loading plugins return to their saved positions. Its settings let you change the width or turn off animations and labels.
 
 ## Install
 

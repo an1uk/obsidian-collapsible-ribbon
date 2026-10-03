@@ -31,6 +31,7 @@ export default class CollapsibleRibbonPlugin extends Plugin {
       () => this.app.workspace.leftRibbon,
       () => this.settings,
       (patch) => this.updateSettings(patch),
+      () => this.refreshNativeRibbonSettings(),
     );
     this.addSettingTab(new RibbonSettingTab(this));
     this.registerEvent(this.app.workspace.on("layout-change", () => {
@@ -46,6 +47,15 @@ export default class CollapsibleRibbonPlugin extends Plugin {
         this.order?.refresh();
       }
     });
+  }
+
+  private refreshNativeRibbonSettings(): void {
+    if (!this.active) return;
+    // Native settings cache page definitions even while closed; update through their own renderer.
+    const manager = (this.app as unknown as { setting?: { settingTabs?: unknown } }).setting;
+    if (!Array.isArray(manager?.settingTabs)) return;
+    const tab = manager.settingTabs.find((entry) => entry?.id === "interface");
+    if (typeof tab?.update === "function") tab.update();
   }
 
   updateSettings(patch: Partial<RibbonSettings>): void {

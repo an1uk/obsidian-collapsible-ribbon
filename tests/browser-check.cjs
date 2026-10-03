@@ -16,6 +16,15 @@ function archiveText(name) {
   const start = 8 + file.readUInt32LE(4) + Number(entry.offset);
   return file.subarray(start, start + entry.size).toString();
 }
+
+const nativeApp = archiveText("app.js");
+const pageStart = nativeApp.indexOf("t.prototype.buildRibbonPage=function") + "t.prototype.buildRibbonPage=".length;
+const pageEnd = nativeApp.indexOf(",t.prototype.buildToolbarPageDef=", pageStart);
+const updateStart = nativeApp.indexOf("e.prototype.update=function", nativeApp.indexOf("l6=function")) + "e.prototype.update=".length;
+const updateEnd = nativeApp.indexOf(",e.prototype.getControlValue=", updateStart);
+assert.ok(pageEnd > pageStart && updateEnd > updateStart, "native settings methods must be found");
+const nativeSettingsScript = "window.NativeSettings=(function(){const rd={isPhone:false},H2=()=>{},Kd=(items,from,to)=>items.splice(to,0,items.splice(from,1)[0]),bd={setting:{appearance:{optionConfigureRibbon:()=>\"Ribbon menu configuration\",optionConfigureRibbonDesc:()=>\"\",labelAdditionalRibbonItems:()=>\"Hidden\"}}};return {build:(" + nativeApp.slice(pageStart,pageEnd) + "),update:(" + nativeApp.slice(updateStart,updateEnd) + ")};})();";
+
 const svg = '<svg class="svg-icon" viewBox="0 0 24 24"><path d="M5 5h14v14H5z" stroke="currentColor" fill="none"/></svg>';
 function markup(theme, css) {
   return '<html><head><style>' + archiveText("app.css") + '</style><style>' +
@@ -227,17 +236,31 @@ function markup(theme, css) {
       await page.setContent(markup(theme, css));
       await page.addScriptTag({ content: bundle.outputFiles[0].text });
       await page.addScriptTag({ content: orderBundle.outputFiles[0].text });
+      await page.addScriptTag({ content: nativeSettingsScript });
       await page.evaluate(() => {
         window.saved = { settingsVersion:2, pinned:false, expandedWidth:220, animate:false, showLabels:true,
           ribbonOrder:["late", "long-label", "calendar"] };
         window.native = {
           containerEl: document.querySelector(".mod-left"), ribbonItemsEl:document.querySelector(".side-dock-actions"),
-          items: ["calendar", "long-label"].map(id => ({id,buttonEl:document.getElementById(id)})),
-          onChange() { this.ribbonItemsEl.replaceChildren(...this.items.map(item => item.buttonEl)); },
+          items: ["calendar", "long-label"].map(id => ({id,buttonEl:document.getElementById(id),title:document.getElementById(id).getAttribute("aria-label"),icon:"square",hidden:false})),
+          onChange() { this.ribbonItemsEl.replaceChildren(...this.items.map(item => {item.buttonEl.style.display=item.hidden?"none":"";return item.buttonEl;})); },
         };
+        window.originalNativeChange = native.onChange;
+        window.tab = {name:"Interface",settingItems:[],getSettingDefinitions(){return [NativeSettings.build.call(this)];},update:NativeSettings.update,
+          app:{workspace:{leftRibbon:native}}};
+        tab.setting={activeTab:null,pageStack:[],refreshSearch(){},refreshCurrentPage(target){
+          if (this.activeTab!==target || !window.settingsFrame) return;
+          const doc=settingsFrame.contentDocument, list=doc.getElementById("rows");
+          const nodes=new Map(Array.from(list.children,el=>[el.dataset.name,el]));
+          const rows=target.settingItems[0].items[0].items.map(item=>{
+            let row=nodes.get(item.name);if(!row){row=doc.createElement("button");row.dataset.name=item.name;row.textContent=item.name;}return row;
+          });
+          list.replaceChildren(...rows);
+        }};
+        tab.update();
         window.orderWrites = [];
         window.order = new FixtureOrder.RibbonOrder(document.querySelector(".workspace"), () => native,
-          () => saved, patch => {orderWrites.push(patch); Object.assign(saved,patch);});
+          () => saved, patch => {orderWrites.push(patch); Object.assign(saved,patch);}, () => tab.update());
         window.rail = new FixtureRail.RibbonRail(document.querySelector(".workspace"), () => saved,
           patch => {Object.assign(saved,patch);rail.applySettings();}, button => {
             button.textContent="pin"; button.setAttribute("aria-label","Pin ribbon open");
@@ -245,7 +268,7 @@ function markup(theme, css) {
         rail.refresh(); order.refresh();
         window.late = document.getElementById("calendar").cloneNode(true);
         late.id="late"; late.setAttribute("aria-label","Late plugin");
-        native.items.push({id:"late",buttonEl:late}); native.onChange(false);
+        native.items.push({id:"late",buttonEl:late,title:"Late plugin",icon:"square",hidden:false}); native.onChange(false);
       });
       await page.waitForFunction(() => document.querySelector(".side-dock-actions").firstElementChild.id === "late");
       const orderIds = () => page.evaluate(() => Array.from(native.ribbonItemsEl.children,el=>el.id));
@@ -273,15 +296,51 @@ function markup(theme, css) {
       await page.evaluate(() => {
         order.destroy(); native.items = native.items.filter(item=>item.id!=="late"); native.onChange(false);
         window.order = new FixtureOrder.RibbonOrder(document.querySelector(".workspace"), () => native,
-          () => saved, patch => {orderWrites.push(patch);Object.assign(saved,patch);});
-        order.refresh(); native.items.push({id:"late",buttonEl:late}); native.onChange(false);
+          () => saved, patch => {orderWrites.push(patch);Object.assign(saved,patch);}, () => tab.update());
+        order.refresh(); native.items.push({id:"late",buttonEl:late,title:"Late plugin",icon:"square",hidden:false}); native.onChange(false);
       });
       await page.waitForFunction(() => native.ribbonItemsEl.children[1].id === "late");
       assert.deepEqual(await orderIds(), ["calendar", "late", "long-label"]);
+      await page.waitForFunction(() => tab.settingItems[0].items[0].items[0].name === "Calendar");
+      assert.deepEqual(await page.evaluate(() => tab.settingItems[0].items[0].items.map(item=>item.name)),
+        ["Calendar","Late plugin","A deliberately long label that must truncate"], "closed settings cache must follow the ribbon");
+      await page.evaluate(() => {
+        window.settingsFrame=document.createElement("iframe");settingsFrame.id="settings-window";
+        settingsFrame.style.cssText="position:fixed;left:480px;top:230px;width:460px;height:260px;z-index:100";
+        document.body.append(settingsFrame);
+        const doc=settingsFrame.contentDocument;
+        doc.body.innerHTML='<h3>Interface / Ribbon menu configuration</h3><button id="reorder">Move first item to end</button><div id="rows"></div>';
+        doc.getElementById("reorder").onclick=()=>{const list=tab.settingItems[0].items[0];list.onReorder(0,list.items.length-1);};
+        tab.setting.activeTab=tab;tab.setting.pageStack=[{page:{title:"Ribbon menu configuration"}}];
+        window.originalPageStack=tab.setting.pageStack;
+        tab.update();
+      });
+      await page.frameLocator("#settings-window").locator("#reorder").click();
+      await page.waitForFunction(() => saved.ribbonOrder[0] === "late");
+      assert.deepEqual(await orderIds(), ["late","long-label","calendar"]);
+      assert.deepEqual(await page.frameLocator("#settings-window").locator("#rows button").allTextContents(),
+        ["Late plugin","A deliberately long label that must truncate","Calendar"]);
+      assert.equal(await page.evaluate(() => tab.setting.pageStack === originalPageStack && tab.setting.activeTab === tab),true);
+      assert.equal(await page.frameLocator("#settings-window").locator("#reorder").evaluate(el=>el.ownerDocument.activeElement===el),true);
+      await page.evaluate(() => {
+        tab.settingItems[0].items[0].onDelete(0);
+      });
+      await page.waitForFunction(() => native.items[0].hidden === true);
+      assert.equal(await page.locator("#late").evaluate(el=>getComputedStyle(el).display),"none");
+      await page.evaluate(() => {tab.settingItems[0].items[1].items[0].action();});
+      await page.waitForFunction(() => native.items[0].hidden === false);
+      assert.deepEqual(await orderIds(), ["late","long-label","calendar"]);
+      await page.evaluate(() => {tab.settingItems[0].items[0].onReorder(2,0);});
+      await page.waitForFunction(() => saved.ribbonOrder[0] === "calendar");
+      assert.deepEqual(await orderIds(), ["calendar","late","long-label"]);
+      assert.deepEqual(await page.frameLocator("#settings-window").locator("#rows button").allTextContents(),
+        ["Calendar","Late plugin","A deliberately long label that must truncate"]);
       await page.evaluate(() => {order.destroy();rail.destroy();native.items.reverse();native.onChange(false);});
+      assert.equal(await page.evaluate(() => native.onChange===originalNativeChange),true);
+
       await page.waitForTimeout(30);
       assert.deepEqual(await orderIds(), ["long-label", "late", "calendar"]);
-      console.log(JSON.stringify({theme, orderRestored:true, nativeMouseCommitSaved:true, lateReloadRestored:true, orderUnloadClean:true}));
+      console.log(JSON.stringify({theme, orderRestored:true, nativeMouseCommitSaved:true, lateReloadRestored:true, settingsBothDirections:true, settingsWindowFocus:true, orderUnloadClean:true}));
     }
   } finally { await browser.close(); }
 })().catch((error) => { console.error(error); process.exitCode = 1; });
