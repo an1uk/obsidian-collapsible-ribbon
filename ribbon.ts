@@ -1,5 +1,5 @@
 import { clampWidth, MIN_WIDTH, MAX_WIDTH, type RibbonSettings } from "./settings";
-import { RibbonItems } from "./ribbon-items";
+import { RibbonItems, RIBBON_SELECTOR } from "./ribbon-items";
 
 type RailMode = "collapsed" | "overlay" | "pinned";
 type SavedStyle = { value: string; priority: string };
@@ -52,7 +52,7 @@ export class RibbonRail {
 
   refresh(): void {
     if (this.destroyed) return;
-    const ribbon = this.workspace.querySelector<HTMLElement>(".workspace-ribbon.mod-left");
+    const ribbon = this.workspace.querySelector<HTMLElement>(RIBBON_SELECTOR);
     if (ribbon !== this.ribbon) {
       this.detach();
       if (!ribbon) return;

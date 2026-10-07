@@ -1,3 +1,6 @@
+// Obsidian 1.14 uses logical side classes; retain the older physical-side selector.
+export const RIBBON_SELECTOR = ".workspace-ribbon:is(.mod-primary, .mod-left)";
+
 export const ACTIONS = ".side-dock-actions > .side-dock-ribbon-action, .side-dock-settings > .side-dock-ribbon-action";
 export const TOOLTIP_CLASS = "cr-ribbon-tooltip";
 

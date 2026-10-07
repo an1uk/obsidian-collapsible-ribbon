@@ -9,33 +9,21 @@ if (![archivePath, themePath, chromePath, playwrightPath].every(Boolean)) {
   throw new Error("Usage: node tests/browser-check.cjs <obsidian.asar> <theme.css> <chrome.exe> <playwright-module>");
 }
 const { chromium } = require(playwrightPath);
-function archiveText(name) {
-  const file = fs.readFileSync(archivePath);
-  const header = JSON.parse(file.subarray(16, 16 + file.readUInt32LE(12)).toString());
-  const entry = header.files[name];
-  const start = 8 + file.readUInt32LE(4) + Number(entry.offset);
-  return file.subarray(start, start + entry.size).toString();
-}
-
-const nativeApp = archiveText("app.js");
-const pageStart = nativeApp.indexOf("t.prototype.buildRibbonPage=function") + "t.prototype.buildRibbonPage=".length;
-const pageEnd = nativeApp.indexOf(",t.prototype.buildToolbarPageDef=", pageStart);
-const updateStart = nativeApp.indexOf("e.prototype.update=function", nativeApp.indexOf("l6=function")) + "e.prototype.update=".length;
-const updateEnd = nativeApp.indexOf(",e.prototype.getControlValue=", updateStart);
-assert.ok(pageEnd > pageStart && updateEnd > updateStart, "native settings methods must be found");
-const nativeSettingsScript = "window.NativeSettings=(function(){const rd={isPhone:false},H2=()=>{},Kd=(items,from,to)=>items.splice(to,0,items.splice(from,1)[0]),bd={setting:{appearance:{optionConfigureRibbon:()=>\"Ribbon menu configuration\",optionConfigureRibbonDesc:()=>\"\",labelAdditionalRibbonItems:()=>\"Hidden\"}}};return {build:(" + nativeApp.slice(pageStart,pageEnd) + "),update:(" + nativeApp.slice(updateStart,updateEnd) + ")};})();";
-
+const host = require("./obsidian-host.cjs").loadObsidian(archivePath);
+const archiveText = host.read;
+const ribbonSelector = ".workspace-ribbon." + host.ribbonSide;
+const nativeSettingsScript = "window.NativeSettings=" + host.settingsScript + ";";
 const svg = '<svg class="svg-icon" viewBox="0 0 24 24"><path d="M5 5h14v14H5z" stroke="currentColor" fill="none"/></svg>';
 function markup(theme, css) {
   return '<html><head><style>' + archiveText("app.css") + '</style><style>' +
     fs.readFileSync(themePath, "utf8") + '</style><style>' + css + '</style></head>' +
-    '<body class="' + theme + ' show-ribbon is-focused"><div class="app-container"><div class="horizontal-main-container"><div class="workspace">' +
-    '<div class="workspace-ribbon mod-left"><div class="sidebar-toggle-button mod-left"><div class="clickable-icon">' + svg + '</div></div>' +
+    '<script>window.fixtureRibbonSelector=' + JSON.stringify(ribbonSelector) + ';</script><body class="' + theme + ' show-ribbon is-focused"><div class="app-container"><div class="horizontal-main-container"><div class="workspace">' +
+    '<div class="workspace-ribbon ' + host.ribbonSide + '"><div class="sidebar-toggle-button mod-left mod-primary"><div class="clickable-icon">' + svg + '</div></div>' +
     '<div class="side-dock-actions"><div id="calendar" class="clickable-icon side-dock-ribbon-action" aria-label="Calendar">' + svg + '</div>' +
     '<div id="long-label" class="clickable-icon side-dock-ribbon-action" aria-label="A deliberately long label that must truncate">' + svg + '</div></div>' +
     '<div class="side-dock-settings"><div id="settings" class="clickable-icon side-dock-ribbon-action" title="Settings">' + svg + '</div></div></div>' +
     '<div id="editor" class="workspace-split mod-root" style="flex:1 1 0;min-width:0"><div class="workspace-leaf">Editor</div></div>' +
-    '<div class="workspace-ribbon mod-right"></div></div></div></div><div id="ribbon-tip" class="tooltip cr-ribbon-tooltip">Ribbon tooltip</div>' +
+    '<div class="workspace-ribbon ' + (host.ribbonSide === 'mod-primary' ? 'mod-secondary' : 'mod-right') + '"></div></div></div></div><div id="ribbon-tip" class="tooltip cr-ribbon-tooltip">Ribbon tooltip</div>' +
     '<div id="other-tip" class="tooltip">Other tooltip</div><button id="outside" style="position:fixed;left:800px;top:100px">Outside</button></body></html>';
 }
 
@@ -46,23 +34,23 @@ function markup(theme, css) {
   const browser = await chromium.launch({ headless: true, executablePath: chromePath });
   try {
     const page = await browser.newPage({ viewport: { width: 1000, height: 650 } });
-    for (const theme of [
+    for (const theme of (process.argv[6] === "basic" ? ["theme-light", "theme-dark"] : [
       "theme-light", "theme-dark",
       "theme-light anp-card-layout anp-card-layout-actions",
       "theme-dark anp-card-layout anp-card-layout-actions anp-colorful-frame",
       "theme-dark anp-border-layout anp-colorful-frame",
-    ]) {
+    ])) {
       await page.setContent(markup(theme, css));
       const geometry = () => page.evaluate(() => {
         const rect = (selector) => document.querySelector(selector).getBoundingClientRect();
         return {
-          ribbon: rect(".workspace-ribbon.mod-left").width,
+          ribbon: rect(fixtureRibbonSelector).width,
           editor: rect("#editor").width,
           header: rect(".sidebar-toggle-button").width,
           icons: Array.from(document.querySelectorAll(".side-dock-ribbon-action:not(.cr-pin) svg")).map((el) => {
             const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
           }),
-          mode: document.querySelector(".workspace-ribbon.mod-left").getAttribute("data-cr-mode"),
+          mode: document.querySelector(fixtureRibbonSelector).getAttribute("data-cr-mode"),
         };
       });
       const original = await geometry();
@@ -96,7 +84,7 @@ function markup(theme, css) {
       assert.equal(overlay.ribbon, original.ribbon, "hover must keep ribbon width");
       assert.equal(overlay.editor, original.editor, "hover must keep editor width");
       assert.equal(overlay.header, original.header, "hover must keep header width");
-      await page.waitForFunction(() => document.querySelector(".workspace-ribbon.mod-left").dataset.crMode === "overlay" && Math.abs(document.querySelector(".cr-overlay-background").getBoundingClientRect().width - 220) < 1, null, { timeout: 2000 });
+      await page.waitForFunction(() => document.querySelector(fixtureRibbonSelector).dataset.crMode === "overlay" && Math.abs(document.querySelector(".cr-overlay-background").getBoundingClientRect().width - 220) < 1, null, { timeout: 2000 });
       assert.ok(Math.abs(await page.locator(".cr-overlay-background").evaluate((el) => el.getBoundingClientRect().width) - 220) < 1);
       assert.equal(await page.locator("#calendar").evaluate((el) => getComputedStyle(el).getPropertyValue("--no-tooltip").trim()), "true");
       assert.equal(await page.locator("#ribbon-tip").evaluate((el) => getComputedStyle(el).display), "none");
@@ -119,7 +107,7 @@ function markup(theme, css) {
       assert.equal(await page.evaluate(() => saved.expandedWidth), 220);
       assert.equal(await page.evaluate(() => writes.length), 0);
       assert.equal(await page.locator(".cr-resize-handle").getAttribute("aria-valuenow"), "260");
-      assert.equal(await page.locator(".workspace-ribbon.mod-left").evaluate((el) => getComputedStyle(el).transitionDuration), "0s");
+      assert.equal(await page.locator(ribbonSelector).evaluate((el) => getComputedStyle(el).transitionDuration), "0s");
       await page.mouse.up(); await page.waitForTimeout(170);
       assert.equal(await page.evaluate(() => saved.expandedWidth), 260);
       assert.equal(await page.evaluate(() => writes.length), 1);
@@ -137,7 +125,7 @@ function markup(theme, css) {
       assert.equal(await page.evaluate(() => saved.expandedWidth), 220);
       assert.equal(await page.evaluate(() => writes.length), writesBeforeCancel);
       await page.locator(".cr-pin").click();
-      await page.waitForFunction(() => Math.abs(document.querySelector(".workspace-ribbon.mod-left").getBoundingClientRect().width - 220) < 0.1, null, { timeout: 2000 });
+      await page.waitForFunction(() => Math.abs(document.querySelector(fixtureRibbonSelector).getBoundingClientRect().width - 220) < 0.1, null, { timeout: 2000 });
       const pinned = await geometry();
       assert.equal(pinned.mode, "pinned");
       assert.ok(Math.abs(pinned.ribbon - 220) < 0.1);
@@ -154,13 +142,13 @@ function markup(theme, css) {
         for (let index = 0; index < original.icons.length; index++) {
           assert.ok(Math.abs(original.icons[index].x - state.icons[index].x) < 1, "icons must keep horizontal position");
           // The bottom settings action intentionally moves up by the height of the added pin row.
-          if (index < original.icons.length - 1) assert.ok(Math.abs(original.icons[index].y - state.icons[index].y) < 1, "top rows must keep height");
+          if (index < original.icons.length - 1) assert.ok(Math.abs(original.icons[index].y - state.icons[index].y) < 1, "top rows must keep height: " + JSON.stringify({original,collapsed,overlay,pinned,state,index}));
           assert.ok(Math.abs(collapsed.icons[index].y - state.icons[index].y) < 1, "expansion must keep row height");
         }
       }
       // A theme width change must refresh the native icon column without changing hover allocation.
       await page.evaluate(() => { document.body.style.setProperty("--ribbon-width", "50px"); rail.refreshMetrics(); });
-      await page.waitForFunction(() => Math.abs(document.querySelector(".workspace-ribbon.mod-left").getBoundingClientRect().width - 50) < 0.1, null, { timeout: 2000 });
+      await page.waitForFunction(() => Math.abs(document.querySelector(fixtureRibbonSelector).getBoundingClientRect().width - 50) < 0.1, null, { timeout: 2000 });
       const widerNative = await geometry(); assert.ok(Math.abs(widerNative.ribbon - 50) < 0.1);
       await page.locator("#calendar").hover(); await page.waitForTimeout(200);
       const widerHover = await geometry(); assert.ok(Math.abs(widerHover.ribbon - 50) < 0.1); assert.ok(Math.abs(widerHover.editor - widerNative.editor) < 0.1);
@@ -170,16 +158,16 @@ function markup(theme, css) {
       await page.evaluate(() => { saved.pinned = true; saved.showLabels = false; saved.animate = false; rail.applySettings(); });
       await page.waitForTimeout(30);
       assert.equal(await page.locator("#long-label").evaluate((el) => getComputedStyle(el, "::after").content), "none");
-      assert.equal(await page.locator(".workspace-ribbon.mod-left").evaluate((el) => getComputedStyle(el).transitionDuration), "0s");
+      assert.equal(await page.locator(ribbonSelector).evaluate((el) => getComputedStyle(el).transitionDuration), "0s");
       await page.evaluate(() => { saved.showLabels = true; rail.applySettings(); });
       await page.setViewportSize({ width: 1100, height: 700 });
-      await page.waitForFunction(() => Math.abs(document.querySelector(".cr-resize-handle").getBoundingClientRect().height - document.querySelector(".workspace-ribbon.mod-left").getBoundingClientRect().height) < 1, null, { timeout: 2000 });
-      const panel = await page.locator(".workspace-ribbon.mod-left").boundingBox();
+      await page.waitForFunction(() => Math.abs(document.querySelector(".cr-resize-handle").getBoundingClientRect().height - document.querySelector(fixtureRibbonSelector).getBoundingClientRect().height) < 1, null, { timeout: 2000 });
+      const panel = await page.locator(ribbonSelector).boundingBox();
       const separator = await page.locator(".cr-resize-handle").boundingBox();
       assert.ok(Math.abs(separator.x + separator.width - panel.x - panel.width) < 1);
       assert.ok(Math.abs(separator.height - panel.height) < 1);
       await page.setViewportSize({ width: 1000, height: 650 });
-      await page.waitForFunction(() => Math.abs(document.querySelector(".cr-resize-handle").getBoundingClientRect().height - document.querySelector(".workspace-ribbon.mod-left").getBoundingClientRect().height) < 1, null, { timeout: 2000 });
+      await page.waitForFunction(() => Math.abs(document.querySelector(".cr-resize-handle").getBoundingClientRect().height - document.querySelector(fixtureRibbonSelector).getBoundingClientRect().height) < 1, null, { timeout: 2000 });
       if (theme === "theme-dark") {
         await page.screenshot({ path: "tests/.generated/pinned-dark.png" });
         await page.evaluate(() => { saved.pinned = false; rail.applySettings(); });
@@ -188,7 +176,7 @@ function markup(theme, css) {
       }
       await page.emulateMedia({ reducedMotion: "reduce" });
       await page.evaluate(() => { saved.animate = true; saved.pinned = true; rail.applySettings(); });
-      assert.equal(await page.locator(".workspace-ribbon.mod-left").evaluate((el) => getComputedStyle(el).transitionDuration), "0s");
+      assert.equal(await page.locator(ribbonSelector).evaluate((el) => getComputedStyle(el).transitionDuration), "0s");
       await page.emulateMedia({ reducedMotion: "no-preference" });
       await page.evaluate(() => {
         const action = document.createElement("div");
@@ -241,7 +229,7 @@ function markup(theme, css) {
         window.saved = { settingsVersion:2, pinned:false, expandedWidth:220, animate:false, showLabels:true,
           ribbonOrder:["late", "long-label", "calendar"] };
         window.native = {
-          containerEl: document.querySelector(".mod-left"), ribbonItemsEl:document.querySelector(".side-dock-actions"),
+          containerEl: document.querySelector(fixtureRibbonSelector), ribbonItemsEl:document.querySelector(".side-dock-actions"),
           items: ["calendar", "long-label"].map(id => ({id,buttonEl:document.getElementById(id),title:document.getElementById(id).getAttribute("aria-label"),icon:"square",hidden:false})),
           onChange() { this.ribbonItemsEl.replaceChildren(...this.items.map(item => {item.buttonEl.style.display=item.hidden?"none":"";return item.buttonEl;})); },
         };

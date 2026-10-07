@@ -12,9 +12,9 @@ const markup = '<div class="workspace-ribbon mod-left" style="--ribbon-width:44p
   '<div class="side-dock-settings"><div class="side-dock-ribbon-action clickable-icon" title="Settings"><svg></svg></div></div></div>';
 const delay = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
 
-function fixture() {
+function fixture(side = "mod-left") {
   const win = new Window();
-  win.document.body.innerHTML = '<div class="workspace">' + markup +
+  win.document.body.innerHTML = '<div class="workspace">' + markup.replace('mod-left', side) +
     '<div class="workspace-ribbon mod-right"><div class="side-dock-ribbon-action" aria-label="Right"></div></div></div><button id="outside">Outside</button>';
   const workspace = win.document.querySelector(".workspace");
   const settings = { ...DEFAULT_SETTINGS };
@@ -31,7 +31,7 @@ function fixture() {
     bubbles: type !== "pointerleave" && type !== "pointerenter",
     pointerType: "mouse", pointerId: 1, button: 0, clientX: 20, clientY: 70, ...options,
   });
-  const ribbon = () => workspace.querySelector(".mod-left");
+  const ribbon = () => workspace.querySelector(".workspace-ribbon." + side);
   const action = () => ribbon().querySelector(".side-dock-actions .side-dock-ribbon-action");
   const enter = () => action().firstElementChild.dispatchEvent(pointer("pointerover"));
   const leave = () => ribbon().dispatchEvent(pointer("pointerleave", { relatedTarget: win.document.body }));
@@ -325,4 +325,21 @@ test("removing a focused action group releases its hover hold without a focusout
   f.ribbon().querySelector(".side-dock-settings").remove();
   await delay(230); assert.equal(f.mode(), "collapsed");
   await f.close();
+});
+
+
+test("Obsidian 1.14 primary ribbon supports hover, pinning, resizing and clean unload without touching the secondary ribbon", async () => {
+  const f=fixture("mod-primary");
+  const right=f.workspace.querySelector(".mod-right");right.classList.replace("mod-right","mod-secondary");
+  const original=right.outerHTML;
+  f.rail.refresh();f.enter();assert.equal(f.mode(),"overlay");
+  const pin=f.workspace.querySelector(".cr-pin");assert.ok(pin);pin.click();assert.equal(f.mode(),"pinned");
+  const handle=f.workspace.querySelector(".cr-resize-handle");
+  handle.dispatchEvent(new f.win.KeyboardEvent("keydown",{key:"ArrowRight",bubbles:true}));
+  assert.equal(f.settings.expandedWidth,221);
+  pin.click();f.leave();await delay(200);assert.equal(f.mode(),"collapsed");
+  assert.equal(right.outerHTML,original);f.rail.destroy();
+  assert.equal(f.ribbon().querySelector(".cr-pin,.cr-resize-handle,.cr-overlay-background"),null);
+  assert.equal(f.ribbon().classList.contains("cr-ribbon"),false);assert.equal(right.outerHTML,original);
+  await f.win.happyDOM.close();
 });

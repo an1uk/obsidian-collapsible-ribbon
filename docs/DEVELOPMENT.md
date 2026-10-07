@@ -13,16 +13,16 @@ pnpm build
 pnpm test
 ~~~
 
-The optional browser fixture accepts local Obsidian app archive, AnuPpuccin theme CSS, Chromium executable and installed Playwright module paths:
+The optional browser fixture accepts a local Obsidian app archive, theme CSS, Chromium executable and installed Playwright module paths:
 
 ~~~sh
-node tests/browser-check.cjs <obsidian.asar> <theme.css> <chrome.exe> <playwright-module>
+node tests/browser-check.cjs <obsidian.asar> <theme.css> <chrome.exe> <playwright-module> [basic]
 ~~~
 
-An optional native ribbon check for the inspected Obsidian version is also available:
+Omit basic for the five AnuPpuccin variants; use basic for light/dark checks with Blue Topaz or another theme. An optional native ribbon check is also available:
 
 ~~~sh
-node tests/native-order-check.cjs <Obsidian-1.13.7.asar>
+node tests/native-order-check.cjs <obsidian.asar>
 ~~~
 
 It reads the installed code into an isolated test harness and does not modify Obsidian. Quote paths containing spaces. The browser check reads the app/theme resources and runs temporary fixtures in a headless browser; it never operates on the live vault. It also generates preview screenshots in tests/.generated/.
@@ -41,21 +41,21 @@ Only pinned mode changes --ribbon-width. Hover mode widens the existing action g
 
 Tooltip suppression uses Obsidian's --no-tooltip hook plus a ribbon-specific tooltip class to hide already-visible/pending ribbon tooltips. Browser title attributes are temporarily suppressed while expanded, with accessible-name fallback where needed. Current metadata changes from other plugins are preserved when the rail collapses or unloads.
 
-Obsidian does not publicly expose ribbon action DOM or tooltip geometry. The implementation therefore uses the existing .workspace-ribbon.mod-left, .side-dock-actions, .side-dock-settings and .side-dock-ribbon-action structure. These and tooltip behavior were inspected in installed Obsidian 1.13.7; the declared minimum is 1.13.7 to match the CSS version used for verification. Themes/plugins that hide or fundamentally restructure the ribbon, implement custom tooltip systems, or transform its containing layout may need additional compatibility work. No Style Settings dependency is required.
+Obsidian does not publicly expose ribbon action DOM or tooltip geometry. The implementation uses .workspace-ribbon with either .mod-left (Obsidian 1.13) or .mod-primary (1.14), plus .side-dock-actions, .side-dock-settings and .side-dock-ribbon-action. Obsidian 1.14.4 replaced the ribbon’s physical-side class with a logical-side class; version 1.2.2 restores hover and order binding for that structure. The secondary/right ribbon is excluded. Label line height follows --icon-size to keep icons aligned with the changed native sizing. DOM and CSS behavior were verified against Obsidian 1.13.7 and 1.14.4; the minimum remains 1.13.7. Themes/plugins that hide or fundamentally restructure the ribbon, implement custom tooltip systems, or transform its containing layout may need additional compatibility work. No Style Settings dependency is required.
 
 On unload or ribbon replacement, the plugin restores its own native method descriptor (or inherited method). If another plugin has wrapped that method, its wrapper is retained and this plugin’s delegated wrapper becomes inert. It restores its attributes and CSS properties, retains external metadata changes, removes its pin/background/grip, disconnects observers and listeners, cancels timers/frames, and releases pointer capture. Resizing and normal action dragging keep the unpinned overlay open until the gesture finishes.
 
 ## Verification and live acceptance
 
-TypeScript, the production build and 31 behavior tests passed on 2026-10-03. Order checks cover both ordering controls, repeated alternation, late icons, restarts, missing IDs, hidden states, handlers, malformed API fallback, serialized persistence, settings caches, separate-document navigation/focus, method receiver/arguments/results/errors, third-party wrappers, layout replacement and cleanup.
+TypeScript, the production build and 33 behavior tests passed on 2026-10-07. New regressions cover modern primary/secondary ribbon classes, hover, pinning, resizing, late icons, native Settings commits and unload. Order checks cover both ordering controls, repeated alternation, late icons, restarts, missing IDs, hidden states, handlers, malformed API fallback, serialized persistence, settings caches, separate-document navigation/focus, method receiver/arguments/results/errors, third-party wrappers, layout replacement and cleanup.
 
-The optional native-code fixture reads the installed Obsidian 1.13.7 ribbon class, settings page builder and settings update method. It exercises their actual drag, reorder, hide/show and startup/load callbacks with a lightweight host renderer, and verifies synchronized settings definitions and late-icon restoration.
+The optional native-code fixture reads an Obsidian app archive’s ribbon class, settings page builder and settings update method using shared inspected-source helpers. It executes the actual ribbon constructor to establish its side class, verifies hover, and exercises native drag, reorder, hide/show and startup/load callbacks with a lightweight host renderer. It passed with both 1.13.7 and 1.14.4. Downloaded test archives stay in ignored tests/.generated artifacts and are never installed or packaged.
 
-Browser fixtures using actual Obsidian 1.13.7 and AnuPpuccin 1.5.0 CSS passed light, dark, card/actions and border/colourful-frame variants. They verify both ordering directions, cached settings definitions, native settings callbacks, a separate-document settings panel, focus/navigation and cleanup. Existing geometry checks still verify a 44 px ribbon and unchanged editor space while hovering; 220 px pinned width and editor reflow; clickable labels, fixed icon alignment, ellipsis, pointer/keyboard resizing, tooltip scope, reduced motion and window resizing.
+Browser fixtures using actual Obsidian 1.13.7 and 1.14.4 CSS with AnuPpuccin 1.5.0 passed all five light/dark/card/border/frame variants for each app version. Blue Topaz light/dark fixtures also passed on 1.14.4. They verify both ordering directions, cached settings definitions, native settings callbacks, a separate-document settings panel, focus/navigation and cleanup. Existing geometry checks still verify a 44 px ribbon and unchanged editor space while hovering; 220 px pinned width and editor reflow; clickable labels, fixed icon alignment, ellipsis, pointer/keyboard resizing, tooltip scope, reduced motion and window resizing.
 
 These fixtures do not establish live Obsidian acceptance. After installation:
 
-- Fresh installations start unpinned at 220 px. Existing pin, width, animation, label and order preferences survive the 1.2.1 update. Change pin/width and restart to check persistence.
+- Fresh installations start unpinned at 220 px. Existing pin, width, animation, label and order preferences survive the 1.2.2 update. Change pin/width and restart to check persistence.
 - Hover icons, move through blank panel space, and move away. Confirm overlay behavior and delayed dismissal.
 - Pin/unpin and verify editor reflow, stable icon positions and both sidebar controls.
 - Drag the grip in both modes, release outside the rail, cancel a drag, and test keyboard resizing.
@@ -74,7 +74,7 @@ After adding the plugin to the community directory, open its entry, choose Edit 
 
 ## Community directory submission
 
-This repository is public under the [MIT licence](../LICENSE). Releases include main.js, manifest.json and styles.css as individual assets, as well as the manual-install ZIP. The release tag must exactly match manifest.json (1.2.1, without a v prefix).
+This repository is public under the [MIT licence](../LICENSE). Releases include main.js, manifest.json and styles.css as individual assets, as well as the manual-install ZIP. The release tag must exactly match manifest.json (1.2.2, without a v prefix).
 
 After completing the live acceptance checks above, follow the [official submission guide](https://docs.obsidian.md/plugins/releasing/submit-plugin):
 

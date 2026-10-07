@@ -1,3 +1,4 @@
+import { RIBBON_SELECTOR } from "./ribbon-items";
 import type { RibbonSettings } from "./settings";
 
 interface NativeItem { id: string; buttonEl?: HTMLElement; hidden?: boolean; title?: string; icon?: string; }
@@ -124,7 +125,7 @@ export class RibbonOrder {
 
   refresh(): void {
     if (this.destroyed) return;
-    const ribbon = this.workspace.querySelector<HTMLElement>(".workspace-ribbon.mod-left");
+    const ribbon = this.workspace.querySelector<HTMLElement>(RIBBON_SELECTOR);
     if (ribbon !== this.ribbon) {
       this.detach();
       this.ribbon = ribbon;

@@ -1,48 +1,22 @@
-const fs = require("node:fs");
-const vm = require("node:vm");
 const assert = require("node:assert/strict");
 const { Window } = require("happy-dom");
 const { RibbonOrder } = require("./.generated/ribbon-order.js");
 const { RibbonRail } = require("./.generated/ribbon.js");
 const { DEFAULT_SETTINGS } = require("./.generated/settings.js");
-if (!process.argv[2]) throw new Error("Usage: node tests/native-order-check.cjs <Obsidian-1.13.7.asar>");
-const archive = fs.readFileSync(process.argv[2]);
-const header = JSON.parse(archive.subarray(16, 16 + archive.readUInt32LE(12)).toString());
-const entry = header.files["app.js"];
-const offset = 8 + archive.readUInt32LE(4) + Number(entry.offset);
-const app = archive.subarray(offset, offset + entry.size).toString();
-const start = app.indexOf("X6=function(){function e(e,t)");
-const end = app.indexOf(",Q6=", start);
-assert.ok(start >= 0 && end > start, "native ribbon class must be found");
+if (!process.argv[2]) throw new Error("Usage: node tests/native-order-check.cjs <obsidian.asar>");
+const host = require("./obsidian-host.cjs").loadObsidian(process.argv[2]);
 const drops = new WeakMap();
-const NativeRibbon = vm.runInNewContext("(" + app.slice(start + 3, end) + ")", {
-  Gv: (button, drag, group, threshold, begin, drop) => drops.set(button, drop),
-});
-
-const pageStart = app.indexOf("t.prototype.buildRibbonPage=function") + "t.prototype.buildRibbonPage=".length;
-const pageEnd = app.indexOf(",t.prototype.buildToolbarPageDef=", pageStart);
-assert.ok(pageEnd > pageStart, "native ribbon settings builder must be found");
-const buildRibbonPage = vm.runInNewContext("(" + app.slice(pageStart, pageEnd) + ")", {
-  rd: {isPhone:false}, Kd: (items, from, to) => items.splice(to, 0, items.splice(from, 1)[0]),
-  bd: {setting:{appearance:{optionConfigureRibbon:()=>"Ribbon menu configuration",optionConfigureRibbonDesc:()=>"",labelAdditionalRibbonItems:()=>"Hidden"}}},
-});
-const updateStart = app.indexOf("l6=function");
-const updateBody = app.indexOf("e.prototype.update=function", updateStart) + "e.prototype.update=".length;
-const updateEnd = app.indexOf(",e.prototype.getControlValue=", updateBody);
-assert.ok(updateEnd > updateBody, "native settings update method must be found");
-const updateTab = vm.runInNewContext("(" + app.slice(updateBody, updateEnd) + ")", {H2:()=>{}});
-
+const buildRibbonPage = host.settingsMethods.build;
+const updateTab = host.settingsMethods.update;
 function fixture(savedOrder = [], enabled = true) {
   const win = new Window();
-  win.document.body.innerHTML = '<div class="workspace"><div class="workspace-ribbon mod-left" style="--ribbon-width:44px"><div class="side-dock-actions"></div><div class="side-dock-settings"></div></div></div>';
+  win.document.body.innerHTML = '<div class="workspace"></div>';
   const workspace = win.document.querySelector(".workspace");
-  const native = Object.create(NativeRibbon.prototype);
-  native.containerEl = workspace.querySelector(".mod-left");
-  native.items = [];
-  Object.defineProperty(native.items, "remove", { value(item) { const index = this.indexOf(item); if (index >= 0) this.splice(index, 1); } });
-  native.ribbonItemsEl = workspace.querySelector(".side-dock-actions");
+  const native = host.createRibbon(win, {requestSaveLayout:()=>{native.saved=native.serialize();}},
+    (button, drag, group, threshold, begin, drop)=>drops.set(button,drop));
+  workspace.append(native.containerEl);
+  assert.ok(native.containerEl.classList.contains(host.ribbonSide), "actual native constructor establishes the ribbon side");
   native.ribbonItemsEl.setChildrenInPlace = (nodes) => native.ribbonItemsEl.replaceChildren(...nodes);
-  native.workspace = { requestSaveLayout: () => { native.saved = native.serialize(); } };
   native.makeRibbonItemButton = (icon, title, callback) => {
     const button = win.document.createElement("div");
     button.className = "side-dock-ribbon-action clickable-icon";
@@ -71,9 +45,12 @@ function fixture(savedOrder = [], enabled = true) {
   return {win, native, rail, settings, tab, orderController, add, order, flush, close};
 }
 (async () => {
+  console.log(JSON.stringify({obsidianVersion:host.version,nativeRibbonClass:host.ribbonSide}));
   const first = fixture();
   first.add("core:first"); const middle = first.add("plugin:middle"); first.add("core:last");
   first.tab.update(); first.rail.refresh(); first.orderController.refresh();
+  middle.dispatchEvent(new first.win.PointerEvent("pointerover", {bubbles:true,pointerType:"mouse"}));
+  assert.equal(first.native.containerEl.dataset.crMode,"overlay", "actual native ribbon must expand on hover");
   await first.flush();
   middle.dispatchEvent(new first.win.MouseEvent("mousedown", {bubbles:true,button:0}));
   first.win.dispatchEvent(new first.win.MouseEvent("mouseup", {button:0}));

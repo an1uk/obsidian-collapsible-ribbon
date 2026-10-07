@@ -10,11 +10,11 @@ const delay = () => new Promise((resolve) => setTimeout(resolve, 25));
 
 function fixture(saved = [], options = {}) {
   const win = new Window();
-  win.document.body.innerHTML = '<div class="workspace"><div class="workspace-ribbon mod-left"><div class="side-dock-actions"></div><div class="side-dock-settings"></div></div><div class="workspace-ribbon mod-right"></div></div>';
+  win.document.body.innerHTML = '<div class="workspace"><div class="workspace-ribbon ' + (options.side ?? "mod-left") + '"><div class="side-dock-actions"></div><div class="side-dock-settings"></div></div><div class="workspace-ribbon mod-right"></div></div>';
   const workspace = win.document.querySelector(".workspace");
   const settings = { ...DEFAULT_SETTINGS, ribbonOrder: [...saved] }, patches = [];
   const native = {
-    containerEl: workspace.querySelector(".mod-left"), ribbonItemsEl: workspace.querySelector(".side-dock-actions"),
+    containerEl: workspace.querySelector(".workspace-ribbon." + (options.side ?? "mod-left")), ribbonItemsEl: workspace.querySelector(".side-dock-actions"),
     items: [], notifications: [],
     onChange(save) {
       this.notifications.push(save);
@@ -298,4 +298,13 @@ test("missing or changed native Settings APIs do not prevent native order commit
     assert.deepEqual(plugin.saved.at(-1).ribbonOrder,["b","a"]);assert.deepEqual(f.ids(),["b","a"]);
     plugin.onunload();await f.close();
   }
+});
+
+
+test("Obsidian 1.14 primary ribbon restores late icons and commits native Settings order", async () => {
+  const pages=[];const f=fixture(["late","a"],{side:"mod-primary",refresh:native=>pages.push(native.items.map(item=>item.id))});
+  f.add("a");f.order.refresh();f.add("late");await delay();assert.deepEqual(f.ids(),["late","a"]);
+  f.native.items.reverse();f.native.onChange(true);await delay();
+  assert.deepEqual(f.settings.ribbonOrder,["a","late"]);assert.deepEqual(pages.at(-1),["a","late"]);
+  await f.close();
 });
