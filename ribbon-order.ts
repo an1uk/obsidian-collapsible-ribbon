@@ -6,7 +6,7 @@ interface NativeRibbon {
   containerEl: HTMLElement;
   ribbonItemsEl: HTMLElement;
   items: NativeItem[];
-  onChange(save: boolean, ...args: unknown[]): unknown;
+  onChange: (this: NativeRibbon, save: boolean, ...args: unknown[]) => unknown;
 }
 
 const same = (a: readonly string[], b: readonly string[]) =>
@@ -18,7 +18,7 @@ function mergeOrder(saved: string[], current: string[]): string[] {
   const known = new Set(saved);
   const reordered = current.filter((id) => known.has(id));
   let index = 0;
-  return saved.map((id) => present.has(id) ? reordered[index++]! : id)
+  return saved.map((id) => present.has(id) ? reordered[index++] : id)
     .concat(current.filter((id) => !known.has(id)));
 }
 
@@ -32,7 +32,7 @@ export class RibbonOrder {
   private hook: { target: NativeRibbon; release: () => void } | null = null;
   private timer: number | null = null;
   private destroyed = false;
-  private readonly win: Window & typeof globalThis;
+  private readonly win: Window & typeof window;
 
   constructor(
     private readonly workspace: HTMLElement,
@@ -41,7 +41,9 @@ export class RibbonOrder {
     private readonly save: (patch: Partial<RibbonSettings>) => void,
     private readonly refreshSettings: () => void = () => {},
   ) {
-    this.win = workspace.ownerDocument.defaultView as Window & typeof globalThis;
+    const win = workspace.ownerDocument.defaultView;
+    if (!win) throw new Error("Ribbon has no owning window");
+    this.win = win;
   }
 
   // Obsidian has no public ordering API. Fail closed if its native structure changes.
@@ -72,23 +74,24 @@ export class RibbonOrder {
     if (descriptor && (!("value" in descriptor) || (!descriptor.configurable && !descriptor.writable))) return false;
     if (!descriptor && !Object.isExtensible(native)) return false;
     const original = native.onChange;
-    const controller = this;
     let active = true;
+    const committed = (target: NativeRibbon, save: boolean): void => {
+      if (!active || this.destroyed || this.restoring || target !== native) return;
+      try {
+        if (this.native() !== native) return;
+        if (save === true) {
+          const order = mergeOrder(this.settings().ribbonOrder, native.items.map((item) => item.id));
+          if (!same(order, this.settings().ribbonOrder)) this.save({ ribbonOrder: order });
+        }
+        this.restore();
+      } catch (error) {
+        // Compatibility failures must not change the native method's return or errors.
+        console.error("Collapsible Ribbon: could not synchronize ribbon order", error);
+      }
+    };
     const wrapper = function(this: NativeRibbon, save: boolean, ...args: unknown[]): unknown {
       const result = original.call(this, save, ...args);
-      if (active && !controller.destroyed && !controller.restoring && this === native) {
-        try {
-          if (controller.native() !== native) return result;
-          if (save === true) {
-            const order = mergeOrder(controller.settings().ribbonOrder, native.items.map((item) => item.id));
-            if (!same(order, controller.settings().ribbonOrder)) controller.save({ ribbonOrder: order });
-          }
-          controller.restore();
-        } catch (error) {
-          // Compatibility failures must not change the native method's return or errors.
-          console.error("Collapsible Ribbon: could not synchronize ribbon order", error);
-        }
-      }
+      committed(this, save);
       return result;
     };
     Object.defineProperty(native, "onChange", descriptor ? { ...descriptor, value: wrapper }

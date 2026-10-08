@@ -17,7 +17,7 @@ await build({
         constructor(app) { this.app = app; this.events = []; this.saved = []; }
         async loadData() { return this.data; }
         saveData(data) { this.saved.push(data); return this.write?.(data) ?? Promise.resolve(); }
-        addSettingTab() {}
+        addSettingTab(tab) { (this.tabs ??= []).push(tab); }
         registerEvent(ref) { this.events.push(ref); }
       }
       export class PluginSettingTab { constructor(app, plugin) { this.app=app; this.plugin=plugin; } }

@@ -1,7 +1,7 @@
 {
   "id": "collapsible-ribbon",
   "name": "Collapsible Ribbon",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "minAppVersion": "1.13.7",
   "description": "Hover to expand the left ribbon over content, pin it open, and drag to set its width.",
   "author": "Alan",

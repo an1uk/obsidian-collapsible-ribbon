@@ -139,7 +139,7 @@
 }
 
 /* Hide only marked ribbon tooltips, including timers started before expansion. */
-body:has(.workspace-ribbon:is(.mod-left, .mod-primary).cr-ribbon[data-cr-mode]:not([data-cr-mode="collapsed"])) .tooltip.cr-ribbon-tooltip {
+body.cr-ribbon-expanded .tooltip.cr-ribbon-tooltip {
   display: none;
 }
 

@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 import { Window } from "happy-dom";
 
 const require = createRequire(import.meta.url);
+const { installDomHelpers } = require("./dom-helpers.cjs");
 const { RibbonRail } = require("./.generated/ribbon.js");
 const { DEFAULT_SETTINGS, normalizeSettings } = require("./.generated/settings.js");
 const Plugin = require("./.generated/plugin.cjs").default;
@@ -14,6 +15,7 @@ const delay = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function fixture(side = "mod-left") {
   const win = new Window();
+  installDomHelpers(win);
   win.document.body.innerHTML = '<div class="workspace">' + markup.replace('mod-left', side) +
     '<div class="workspace-ribbon mod-right"><div class="side-dock-ribbon-action" aria-label="Right"></div></div></div><button id="outside">Outside</button>';
   const workspace = win.document.querySelector(".workspace");
@@ -342,4 +344,48 @@ test("Obsidian 1.14 primary ribbon supports hover, pinning, resizing and clean u
   assert.equal(f.ribbon().querySelector(".cr-pin,.cr-resize-handle,.cr-overlay-background"),null);
   assert.equal(f.ribbon().classList.contains("cr-ribbon"),false);assert.equal(right.outerHTML,original);
   await f.win.happyDOM.close();
+});
+
+
+test("tooltip visibility uses an owned body class and restores it on collapse, layout change and unload", async () => {
+  const f=fixture(); const body=f.win.document.body;
+  f.rail.refresh(); assert.equal(body.classList.contains("cr-ribbon-expanded"),false);
+  f.enter();assert.equal(body.classList.contains("cr-ribbon-expanded"),true);
+  f.leave();await delay(200);assert.equal(body.classList.contains("cr-ribbon-expanded"),false);
+  f.ribbon().querySelector(".cr-pin").click();assert.equal(body.classList.contains("cr-ribbon-expanded"),true);
+  f.rail.destroy();assert.equal(body.classList.contains("cr-ribbon-expanded"),false);
+  await f.win.happyDOM.close();
+  const prior=fixture();prior.win.document.body.classList.add("cr-ribbon-expanded");prior.rail.refresh();
+  prior.rail.destroy();assert.equal(prior.win.document.body.classList.contains("cr-ribbon-expanded"),true);
+  await prior.win.happyDOM.close();
+});
+
+test("Obsidian helpers and tooltip state stay in the ribbon's owning document", async () => {
+  const first=fixture(),second=fixture();first.rail.refresh();second.rail.refresh();
+  first.enter();assert.equal(first.win.document.body.classList.contains("cr-ribbon-expanded"),true);
+  assert.equal(second.win.document.body.classList.contains("cr-ribbon-expanded"),false);
+  for(const control of first.ribbon().querySelectorAll(".cr-pin,.cr-overlay-background,.cr-resize-handle")) {
+    assert.equal(control.ownerDocument,first.win.document);
+  }
+  second.enter();await first.close();assert.equal(second.win.document.body.classList.contains("cr-ribbon-expanded"),true);
+  await second.close();
+});
+
+test("declarative settings expose searchable controls and persist through the normal validated save path", async () => {
+  const f=fixture();let ready;
+  const app={workspace:{containerEl:f.workspace,on:()=>({}),onLayoutReady:callback=>{ready=callback;}}};
+  const plugin=new Plugin(app);plugin.data={...DEFAULT_SETTINGS,pinned:true,expandedWidth:245,animate:false,showLabels:false};
+  await plugin.onload();ready();const tab=plugin.tabs[0];const definitions=tab.getSettingDefinitions();
+  assert.equal(definitions.length,3);assert.ok(definitions.every(item=>item.name && item.searchable!==false));
+  assert.deepEqual(definitions.map(item=>item.control.key),["expandedWidth","animate","showLabels"]);
+  assert.deepEqual(definitions[0].control,{type:"slider",key:"expandedWidth",min:120,max:300,step:1,defaultValue:220,displayFormat:definitions[0].control.displayFormat});
+  assert.equal(definitions[0].control.displayFormat(245),"245 px");
+  assert.equal(tab.getControlValue("expandedWidth"),245);assert.equal(tab.getControlValue("animate"),false);
+  tab.setControlValue("expandedWidth",270.7);tab.setControlValue("animate",true);tab.setControlValue("showLabels",true);
+  await plugin.saveQueue;assert.equal(plugin.settings.expandedWidth,271);assert.equal(plugin.settings.pinned,true);
+  assert.deepEqual(plugin.saved.map(data=>[data.expandedWidth,data.animate,data.showLabels]),[[271,false,false],[271,true,false],[271,true,true]]);
+  const count=plugin.saved.length;
+  for(const [key,value] of [["expandedWidth","bad"],["expandedWidth",NaN],["animate",1],["showLabels",null],["pinned",false]])tab.setControlValue(key,value);
+  await plugin.saveQueue;assert.equal(plugin.saved.length,count);assert.equal(tab.getControlValue("unknown"),undefined);
+  plugin.onunload();await f.win.happyDOM.close();
 });

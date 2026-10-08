@@ -26,6 +26,7 @@ export class RibbonRail {
   private readonly attributes = new Map<string, string | null>();
   private readonly listeners: Array<() => void> = [];
   private hadRootClass = false;
+  private hadTooltipBodyClass = false;
   private pinState: boolean | null = null;
   private open = false;
   private pointerInside = false;
@@ -33,7 +34,7 @@ export class RibbonRail {
   private actionPointer: number | null = null;
   private drag: { id: number; startX: number; width: number } | null = null;
   private previewWidth: number | null = null;
-  private readonly win: Window & typeof globalThis;
+  private readonly win: Window & typeof window;
 
   constructor(
     private readonly workspace: HTMLElement,
@@ -43,7 +44,9 @@ export class RibbonRail {
     renderFallback: (icon: HTMLElement, label: string) => void,
   ) {
     this.items = new RibbonItems(renderFallback);
-    this.win = workspace.ownerDocument.defaultView as Window & typeof globalThis;
+    const win = workspace.ownerDocument.defaultView;
+    if (!win) throw new Error("Ribbon has no owning window");
+    this.win = win;
   }
 
   private get mode(): RailMode {
@@ -58,10 +61,11 @@ export class RibbonRail {
       if (!ribbon) return;
       this.ribbon = ribbon;
       this.hadRootClass = ribbon.classList.contains("cr-ribbon");
+      this.hadTooltipBodyClass = this.win.document.body.classList.contains("cr-ribbon-expanded");
       for (const name of STATE_ATTRIBUTES) this.attributes.set(name, ribbon.getAttribute(name));
       this.refreshMetrics();
       ribbon.classList.add("cr-ribbon");
-      this.createControls();
+      this.createControls(ribbon);
       this.mutation = new this.win.MutationObserver((records) => {
         this.items.capture(records);
         this.applySettings();
@@ -110,9 +114,8 @@ export class RibbonRail {
     this.scheduleGeometry();
   }
 
-  private createControls(): void {
-    const document = this.ribbon!.ownerDocument;
-    this.pin = document.createElement("button");
+  private createControls(ribbon: HTMLElement): void {
+    this.pin = ribbon.createEl("button");
     this.pin.type = "button";
     this.pin.className = "clickable-icon side-dock-ribbon-action cr-pin";
     this.listen(this.pin, "click", () => {
@@ -120,10 +123,10 @@ export class RibbonRail {
       this.updateSettings({ pinned: !this.settings().pinned });
       this.scheduleClose();
     });
-    this.surface = document.createElement("div");
+    this.surface = ribbon.createDiv();
     this.surface.className = "cr-overlay-background";
     this.surface.setAttribute("aria-hidden", "true");
-    this.handle = document.createElement("div");
+    this.handle = ribbon.createDiv();
     this.handle.className = "cr-resize-handle";
     this.handle.tabIndex = 0;
     this.handle.setAttribute("role", "separator");
@@ -179,6 +182,7 @@ export class RibbonRail {
       this.pin?.setAttribute("aria-expanded", String(this.mode !== "collapsed"));
       this.handle?.setAttribute("aria-valuenow", String(width));
       this.handle?.setAttribute("aria-valuetext", width + " pixels");
+      this.win.document.body.classList.toggle("cr-ribbon-expanded", this.mode !== "collapsed");
       this.items.sync(ribbon, this.mode !== "collapsed");
       this.updateGeometry();
     } finally {
@@ -338,7 +342,10 @@ export class RibbonRail {
 
   private setProperty(element: HTMLElement, name: string, value: string): void {
     let saved = this.styles.get(element);
-    if (!saved) this.styles.set(element, saved = new Map());
+    if (!saved) {
+      saved = new Map<string, SavedStyle>();
+      this.styles.set(element, saved);
+    }
     if (!saved.has(name)) saved.set(name, {
       value: element.style.getPropertyValue(name), priority: element.style.getPropertyPriority(name),
     });
@@ -384,6 +391,7 @@ export class RibbonRail {
     for (const [element, properties] of this.styles) this.restoreStyles(element, properties);
     this.styles.clear();
     if (this.ribbon) {
+      this.win.document.body.classList.toggle("cr-ribbon-expanded", this.hadTooltipBodyClass);
       if (!this.hadRootClass) this.ribbon.classList.remove("cr-ribbon");
       for (const [name, value] of this.attributes) {
         if (value === null) this.ribbon.removeAttribute(name);

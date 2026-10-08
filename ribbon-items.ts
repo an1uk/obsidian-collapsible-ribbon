@@ -98,7 +98,7 @@ export class RibbonItems {
       return;
     }
     if (!state.fallback || state.fallback.parentElement !== item) {
-      state.fallback = item.ownerDocument.createElement("span");
+      state.fallback = item.createSpan();
       state.fallback.className = "cr-fallback-icon";
       state.fallback.setAttribute("aria-hidden", "true");
       item.prepend(state.fallback);

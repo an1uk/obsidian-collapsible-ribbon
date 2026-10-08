@@ -1,5 +1,6 @@
 const assert = require("node:assert/strict");
 const { Window } = require("happy-dom");
+const { installDomHelpers } = require("./dom-helpers.cjs");
 const { RibbonOrder } = require("./.generated/ribbon-order.js");
 const { RibbonRail } = require("./.generated/ribbon.js");
 const { DEFAULT_SETTINGS } = require("./.generated/settings.js");
@@ -10,6 +11,7 @@ const buildRibbonPage = host.settingsMethods.build;
 const updateTab = host.settingsMethods.update;
 function fixture(savedOrder = [], enabled = true) {
   const win = new Window();
+  installDomHelpers(win);
   win.document.body.innerHTML = '<div class="workspace"></div>';
   const workspace = win.document.querySelector(".workspace");
   const native = host.createRibbon(win, {requestSaveLayout:()=>{native.saved=native.serialize();}},

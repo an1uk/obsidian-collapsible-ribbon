@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const assert = require("node:assert/strict");
 const { build } = require("esbuild");
+const { installDomHelpers } = require("./dom-helpers.cjs");
 
 // Optional visual check: pass local app archive, theme, Chromium executable and Playwright module.
 const [archivePath, themePath, chromePath, playwrightPath] = process.argv.slice(2);
@@ -41,6 +42,7 @@ function markup(theme, css) {
       "theme-dark anp-border-layout anp-colorful-frame",
     ])) {
       await page.setContent(markup(theme, css));
+      await page.addScriptTag({content:"(" + installDomHelpers.toString() + ")(window);"});
       const geometry = () => page.evaluate(() => {
         const rect = (selector) => document.querySelector(selector).getBoundingClientRect();
         return {

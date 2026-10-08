@@ -8,6 +8,7 @@ Requires Node.js 20+ and pnpm; Obsidian API types are pinned to 1.13.1.
 
 ~~~sh
 pnpm install --frozen-lockfile
+pnpm lint
 pnpm check
 pnpm build
 pnpm test
@@ -27,7 +28,7 @@ node tests/native-order-check.cjs <obsidian.asar>
 
 It reads the installed code into an isolated test harness and does not modify Obsidian. Quote paths containing spaces. The browser check reads the app/theme resources and runs temporary fixtures in a headless browser; it never operates on the live vault. It also generates preview screenshots in tests/.generated/.
 
-main.ts manages lifecycle and serialized settings writes; settings.ts validates and migrates state; ribbon.ts owns interaction and geometry; ribbon-items.ts preserves action labels/tooltip metadata; ribbon-order.ts synchronizes saved positions with native ribbon ordering; styles.css controls layout. No framework or runtime dependency is added. The pnpm build-script allowlist permits only esbuild's platform-binary setup.
+main.ts manages lifecycle, declarative searchable settings and serialized settings writes; guards.ts validates unknown input; settings.ts validates and migrates state; ribbon.ts owns interaction and geometry; ribbon-items.ts preserves action labels/tooltip metadata; ribbon-order.ts synchronizes saved positions with native ribbon ordering; styles.css controls layout. No framework or runtime dependency is added. Development linting uses Obsidian’s official recommended ESLint configuration with zero warnings permitted in CI. No reported rules are disabled. The pnpm build-script allowlist permits only esbuild's platform-binary setup.
 
 ## Compatibility and cleanup
 
@@ -39,7 +40,7 @@ A guarded wrapper delegates to the native onChange method, preserving its receiv
 
 Only pinned mode changes --ribbon-width. Hover mode widens the existing action groups and uses a positioned background and edge handle, leaving the native ribbon's flex allocation and header width unchanged. Theme colours, borders, typography and hover states use inherited styling or Obsidian variables. The native sidebar buttons remain usable.
 
-Tooltip suppression uses Obsidian's --no-tooltip hook plus a ribbon-specific tooltip class to hide already-visible/pending ribbon tooltips. Browser title attributes are temporarily suppressed while expanded, with accessible-name fallback where needed. Current metadata changes from other plugins are preserved when the rail collapses or unloads.
+Tooltip suppression uses Obsidian's --no-tooltip hook plus a ribbon-specific tooltip class to hide already-visible/pending ribbon tooltips. An owned cr-ribbon-expanded class on the ribbon’s document body controls the tagged tooltips; the stylesheet uses no :has selector. The body class is restored on collapse, layout replacement and unload. DOM creation uses parent createEl/createDiv/createSpan helpers and timers/constructors use the ribbon’s owning window. Browser title attributes are temporarily suppressed while expanded, with accessible-name fallback where needed. Current metadata changes from other plugins are preserved when the rail collapses or unloads.
 
 Obsidian does not publicly expose ribbon action DOM or tooltip geometry. The implementation uses .workspace-ribbon with either .mod-left (Obsidian 1.13) or .mod-primary (1.14), plus .side-dock-actions, .side-dock-settings and .side-dock-ribbon-action. Obsidian 1.14.4 replaced the ribbon’s physical-side class with a logical-side class; version 1.2.2 restores hover and order binding for that structure. The secondary/right ribbon is excluded. Label line height follows --icon-size to keep icons aligned with the changed native sizing. DOM and CSS behavior were verified against Obsidian 1.13.7 and 1.14.4; the minimum remains 1.13.7. Themes/plugins that hide or fundamentally restructure the ribbon, implement custom tooltip systems, or transform its containing layout may need additional compatibility work. No Style Settings dependency is required.
 
@@ -47,7 +48,7 @@ On unload or ribbon replacement, the plugin restores its own native method descr
 
 ## Verification and live acceptance
 
-TypeScript, the production build and 33 behavior tests passed on 2026-10-07. New regressions cover modern primary/secondary ribbon classes, hover, pinning, resizing, late icons, native Settings commits and unload. Order checks cover both ordering controls, repeated alternation, late icons, restarts, missing IDs, hidden states, handlers, malformed API fallback, serialized persistence, settings caches, separate-document navigation/focus, method receiver/arguments/results/errors, third-party wrappers, layout replacement and cleanup.
+Strict recommended lint (zero warnings/errors), TypeScript, the production build and 36 behavior tests passed on 2026-10-08. New checks cover searchable setting definitions and validated persistence, owner-document DOM helpers and independent tooltip state/cleanup across windows. New regressions cover modern primary/secondary ribbon classes, hover, pinning, resizing, late icons, native Settings commits and unload. Order checks cover both ordering controls, repeated alternation, late icons, restarts, missing IDs, hidden states, handlers, malformed API fallback, serialized persistence, settings caches, separate-document navigation/focus, method receiver/arguments/results/errors, third-party wrappers, layout replacement and cleanup.
 
 The optional native-code fixture reads an Obsidian app archive’s ribbon class, settings page builder and settings update method using shared inspected-source helpers. It executes the actual ribbon constructor to establish its side class, verifies hover, and exercises native drag, reorder, hide/show and startup/load callbacks with a lightweight host renderer. It passed with both 1.13.7 and 1.14.4. Downloaded test archives stay in ignored tests/.generated artifacts and are never installed or packaged.
 
@@ -55,7 +56,7 @@ Browser fixtures using actual Obsidian 1.13.7 and 1.14.4 CSS with AnuPpuccin 1.5
 
 These fixtures do not establish live Obsidian acceptance. After installation:
 
-- Fresh installations start unpinned at 220 px. Existing pin, width, animation, label and order preferences survive the 1.2.2 update. Change pin/width and restart to check persistence.
+- Fresh installations start unpinned at 220 px. Existing pin, width, animation, label and order preferences survive the 1.2.3 update. Change pin/width and restart to check persistence.
 - Hover icons, move through blank panel space, and move away. Confirm overlay behavior and delayed dismissal.
 - Pin/unpin and verify editor reflow, stable icon positions and both sidebar controls.
 - Drag the grip in both modes, release outside the rail, cancel a drag, and test keyboard resizing.
@@ -63,6 +64,7 @@ These fixtures do not establish live Obsidian acceptance. After installation:
 - Reopen the configuration page and repeat with Settings in a separate window. Check that the current page and keyboard focus remain usable, and hide/show an action without changing its order.
 - Click core/community actions through their icon or label, open context menus, and test native drag/reordering. Check Kanban's Create new board action collapsed and expanded.
 - Enable/disable a ribbon-adding plugin, switch workspaces, and try AnuPpuccin's light/dark, card, border and frame options.
+- Search Settings for “Expanded ribbon width”, “Animate transitions” and “Show labels when expanded”; change each control and verify persistence after restart.
 - Check tooltip suppression only while expanded, labels disabled, animation disabled, and OS reduced motion.
 - Disable the plugin while hovering, pinned, resizing, reordering or waiting to dismiss. Confirm native width and tooltips return and all existing actions work.
 
@@ -74,7 +76,7 @@ After adding the plugin to the community directory, open its entry, choose Edit 
 
 ## Community directory submission
 
-This repository is public under the [MIT licence](../LICENSE). Releases include main.js, manifest.json and styles.css as individual assets, as well as the manual-install ZIP. The release tag must exactly match manifest.json (1.2.2, without a v prefix).
+This repository is public under the [MIT licence](../LICENSE). Releases include main.js, manifest.json and styles.css as individual assets, as well as the manual-install ZIP. The release tag must exactly match manifest.json (1.2.3, without a v prefix).
 
 After completing the live acceptance checks above, follow the [official submission guide](https://docs.obsidian.md/plugins/releasing/submit-plugin):
 

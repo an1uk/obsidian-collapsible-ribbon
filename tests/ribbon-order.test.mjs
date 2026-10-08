@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { createRequire } from "node:module";
 import { Window } from "happy-dom";
 const require = createRequire(import.meta.url);
+const { installDomHelpers } = require("./dom-helpers.cjs");
 const { RibbonOrder } = require("./.generated/ribbon-order.js");
 const { DEFAULT_SETTINGS, normalizeSettings } = require("./.generated/settings.js");
 const Plugin = require("./.generated/plugin.cjs").default;
@@ -10,6 +11,7 @@ const delay = () => new Promise((resolve) => setTimeout(resolve, 25));
 
 function fixture(saved = [], options = {}) {
   const win = new Window();
+  installDomHelpers(win);
   win.document.body.innerHTML = '<div class="workspace"><div class="workspace-ribbon ' + (options.side ?? "mod-left") + '"><div class="side-dock-actions"></div><div class="side-dock-settings"></div></div><div class="workspace-ribbon mod-right"></div></div>';
   const workspace = win.document.querySelector(".workspace");
   const settings = { ...DEFAULT_SETTINGS, ribbonOrder: [...saved] }, patches = [];
